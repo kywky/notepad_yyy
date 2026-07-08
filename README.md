@@ -1,0 +1,51 @@
+# Notepad+ Web
+
+A simple Notepad++ style PWA editor built with Vite, React, TypeScript, and CodeMirror.
+
+## Run
+
+```sh
+npm install
+npm run dev
+```
+
+Open:
+
+```txt
+http://localhost:5173/
+```
+
+## Build
+
+```sh
+npm run build
+```
+
+The production files are generated in:
+
+```txt
+dist/
+```
+
+## Preview Production Build
+
+```sh
+npm run preview -- --port 4173
+```
+
+Open:
+
+```txt
+http://localhost:4173/
+```
+
+## Share To Another Environment
+
+For source development, copy the project without `node_modules/` and run:
+
+```sh
+npm install
+npm run build
+```
+
+For static deployment, build first and serve the `dist/` directory with any static file server.
