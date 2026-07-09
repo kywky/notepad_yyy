@@ -1,7 +1,7 @@
 {
-  "name": "Notepad+ Web",
+  "name": "Notepad+",
   "short_name": "Notepad+",
-  "description": "A Notepad++ style web editor with tabs, search, replace, syntax highlighting, and offline support.",
+  "description": "A Notepad++ style mobile text editor with tabs, search, replace, syntax highlighting, and offline support.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

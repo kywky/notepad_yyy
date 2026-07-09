@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.notepadplus.web"
+    namespace = "com.kywky.notepadyyy"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.notepadplus.web"
+        applicationId "com.kywky.notepadyyy"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

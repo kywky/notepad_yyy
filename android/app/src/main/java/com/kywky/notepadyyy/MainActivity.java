@@ -1,4 +1,4 @@
-package com.notepadplus.web;
+package com.kywky.notepadyyy;
 
 import com.getcapacitor.BridgeActivity;
 

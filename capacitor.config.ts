@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "com.notepadplus.web",
-  appName: "Notepad+ Web",
+  appId: "com.kywky.notepadyyy",
+  appName: "Notepad+",
   webDir: "dist",
   bundledWebRuntime: false,
   server: {

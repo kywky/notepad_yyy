@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Notepad+ Web</string>
-    <string name="title_activity_main">Notepad+ Web</string>
-    <string name="package_name">com.notepadplus.web</string>
-    <string name="custom_url_scheme">com.notepadplus.web</string>
+    <string name="app_name">Notepad+</string>
+    <string name="title_activity_main">Notepad+</string>
+    <string name="package_name">com.kywky.notepadyyy</string>
+    <string name="custom_url_scheme">com.kywky.notepadyyy</string>
 </resources>

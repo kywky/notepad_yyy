@@ -53,6 +53,7 @@ import {
   replaceOne,
   type SearchOptions
 } from "./lib/search";
+import { APP_NAME, isNativeApp } from "./lib/platform";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -208,10 +209,14 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
-    document.title = `${activeDocument.dirty ? "* " : ""}${activeDocument.name} - Notepad+ Web`;
+    document.title = `${activeDocument.dirty ? "* " : ""}${activeDocument.name} - ${APP_NAME}`;
   }, [activeDocument.dirty, activeDocument.name, settings.theme]);
 
   useEffect(() => {
+    if (isNativeApp) {
+      return;
+    }
+
     const handleInstallPrompt = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
@@ -718,14 +723,14 @@ function App() {
         <div className="title-row">
           <div className="brand">
             <FileText size={19} strokeWidth={2} />
-            <span>Notepad+ Web</span>
+            <span>{APP_NAME}</span>
           </div>
           <div className="active-file-chip" title={activeDocument.name}>
             <span>{activeDocument.dirty ? "*" : ""}</span>
             <strong>{activeDocument.name}</strong>
           </div>
           <div className="top-actions">
-            {installPrompt ? (
+            {!isNativeApp && installPrompt ? (
               <button className="install-button" onClick={installApp} type="button">
                 Install
               </button>
