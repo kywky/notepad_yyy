@@ -1,6 +1,6 @@
-# Notepad+ Web
+# notepad_yyy
 
-A simple Notepad++ style PWA editor built with Vite, React, TypeScript, and CodeMirror.
+一个手机端文本编辑器。当前版本使用 Vite、React、TypeScript、CodeMirror 和 Capacitor 构建。
 
 ## Run
 
