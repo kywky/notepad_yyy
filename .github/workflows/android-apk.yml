@@ -52,7 +52,7 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: notepad-plus-web-debug-apk
+          name: notepad-plus-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Publish debug release

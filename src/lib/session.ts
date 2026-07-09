@@ -27,7 +27,8 @@ export type PersistedSession = {
   settings: EditorSettings;
 };
 
-const STORAGE_KEY = "notepad-plus-web-session-v1";
+const STORAGE_KEY = "notepad-plus-session-v1";
+const LEGACY_STORAGE_KEY = "notepad-plus-web-session-v1";
 
 export const defaultSettings: EditorSettings = {
   theme: "light",
@@ -68,7 +69,7 @@ export function createDocument(options: {
 
 export function loadSession(): PersistedSession {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) {
       const document = createDocument({ name: "Untitled-1.txt" });
       return { documents: [document], activeId: document.id, settings: defaultSettings };

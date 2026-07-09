@@ -135,7 +135,6 @@ button {
   gap: 4px;
 }
 
-.install-button,
 .text-button,
 .small-button {
   min-height: 26px;
@@ -144,13 +143,6 @@ button {
   background: var(--surface-2);
   color: var(--text);
   cursor: pointer;
-}
-
-.install-button {
-  padding: 0 10px;
-  color: #ffffff;
-  border-color: var(--accent-strong);
-  background: var(--accent-strong);
 }
 
 .toolbar {
@@ -213,7 +205,6 @@ button {
 .icon-button:focus-visible,
 .text-button:focus-visible,
 .small-button:focus-visible,
-.install-button:focus-visible,
 .language-select:focus-visible,
 .compact-field input:focus-visible,
 .search-panel input:focus-visible {
@@ -902,10 +893,6 @@ button {
   .active-file-chip {
     font-size: 11px;
     height: 24px;
-  }
-
-  .install-button {
-    display: none;
   }
 
   .compact-field {

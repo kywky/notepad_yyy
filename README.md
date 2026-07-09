@@ -1,15 +1,15 @@
-# notepad_yyy
+# Notepad+
 
-一个手机端文本编辑器。当前版本使用 Vite、React、TypeScript、CodeMirror 和 Capacitor 构建。
+一个面向手机 APK 的轻量文本编辑器。当前版本使用 Vite、React、TypeScript、CodeMirror 和 Capacitor 构建。
 
-## Run
+## Local Development
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open:
+Open in a local browser while developing:
 
 ```txt
 http://localhost:5173/
@@ -48,7 +48,7 @@ npm install
 npm run build
 ```
 
-For static deployment, build first and serve the `dist/` directory with any static file server.
+For Android use, build the APK and copy the generated APK to the target phone.
 
 ## Build Android APK
 
@@ -73,5 +73,5 @@ android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 If the local machine does not have Java and Android SDK installed, push the repo to GitHub and run
-the `Android APK` workflow. Download the generated `notepad-plus-web-debug-apk` artifact from the
+the `Android APK` workflow. Download the generated `notepad-plus-debug-apk` artifact from the
 workflow run.

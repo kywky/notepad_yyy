@@ -53,12 +53,7 @@ import {
   replaceOne,
   type SearchOptions
 } from "./lib/search";
-import { APP_NAME, isNativeApp } from "./lib/platform";
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-};
+import { APP_NAME } from "./lib/platform";
 
 type IconButtonProps = {
   label: string;
@@ -165,7 +160,6 @@ function App() {
   const [settings, setSettings] = useState<EditorSettings>(initialSession.settings);
   const [cursor, setCursor] = useState(initialCursor);
   const [searchOptions, setSearchOptions] = useState(initialSearch);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandFilter, setCommandFilter] = useState("");
   const editorRef = useRef<CodeEditorHandle | null>(null);
@@ -211,20 +205,6 @@ function App() {
     document.documentElement.dataset.theme = settings.theme;
     document.title = `${activeDocument.dirty ? "* " : ""}${activeDocument.name} - ${APP_NAME}`;
   }, [activeDocument.dirty, activeDocument.name, settings.theme]);
-
-  useEffect(() => {
-    if (isNativeApp) {
-      return;
-    }
-
-    const handleInstallPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -638,16 +618,6 @@ function App() {
     }
   }
 
-  async function installApp() {
-    if (!installPrompt) {
-      return;
-    }
-
-    await installPrompt.prompt();
-    await installPrompt.userChoice.catch(() => undefined);
-    setInstallPrompt(null);
-  }
-
   const commands = useMemo<AppCommand[]>(
     () => [
       { id: "new", label: "New document", run: newDocument },
@@ -730,11 +700,6 @@ function App() {
             <strong>{activeDocument.name}</strong>
           </div>
           <div className="top-actions">
-            {!isNativeApp && installPrompt ? (
-              <button className="install-button" onClick={installApp} type="button">
-                Install
-              </button>
-            ) : null}
             <IconButton
               active={commandOpen}
               icon={Command}
