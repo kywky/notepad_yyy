@@ -53,6 +53,7 @@ For Android use, build the APK and copy the generated APK to the target phone.
 ## Build Android APK
 
 This project is configured with Capacitor Android.
+The APK uses Android's system file picker for opening and saving text files.
 
 Sync the web build into the Android project:
 

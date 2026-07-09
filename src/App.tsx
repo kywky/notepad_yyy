@@ -54,11 +54,12 @@ import {
   type SearchOptions
 } from "./lib/search";
 import { APP_NAME } from "./lib/platform";
+import { hasNativeFilePicker, openNativeTextFile, saveNativeTextFile } from "./lib/nativeFiles";
 
 type IconButtonProps = {
   label: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number }>;
-  onClick: () => void;
+  onClick: () => unknown;
   active?: boolean;
   disabled?: boolean;
 };
@@ -121,10 +122,6 @@ function readFiles(files: FileList | File[]): Promise<EditorDocument[]> {
       })
     )
   );
-}
-
-function downloadDocument(document: EditorDocument) {
-  downloadText(document.name || "Untitled.txt", document.content);
 }
 
 function downloadText(fileName: string, content: string, type = "text/plain;charset=utf-8") {
@@ -218,12 +215,12 @@ function App() {
 
       if (key === "s") {
         event.preventDefault();
-        saveActiveDocument();
+        void saveActiveDocument();
       }
 
       if (key === "o") {
         event.preventDefault();
-        fileInputRef.current?.click();
+        void openFromDevice();
       }
 
       if (key === "n") {
@@ -309,12 +306,56 @@ function App() {
     setTimeout(() => editorRef.current?.focus(), 0);
   }
 
-  function saveActiveDocument() {
-    downloadDocument(activeDocument);
-    updateDocument(activeDocument.id, { dirty: false });
+  async function openFromDevice() {
+    if (!hasNativeFilePicker()) {
+      fileInputRef.current?.click();
+      return;
+    }
+
+    try {
+      const file = await openNativeTextFile();
+      if (!file) {
+        return;
+      }
+
+      const document = createDocument({
+        name: file.name,
+        content: file.content,
+        dirty: false,
+        language: detectLanguage(file.name)
+      });
+      setDocuments((current) => [...current, document]);
+      setActiveId(document.id);
+      setTimeout(() => editorRef.current?.focus(), 0);
+    } catch {
+      window.alert("Could not open file.");
+    }
   }
 
-  function exportAllDocuments() {
+  async function saveTextOutput(fileName: string, content: string, type = "text/plain;charset=utf-8") {
+    if (hasNativeFilePicker()) {
+      try {
+        const mimeType = type.split(";")[0] || "text/plain";
+        const result = await saveNativeTextFile({ fileName, content, mimeType });
+        return Boolean(result);
+      } catch {
+        window.alert("Could not save file.");
+        return false;
+      }
+    }
+
+    downloadText(fileName, content, type);
+    return true;
+  }
+
+  async function saveActiveDocument() {
+    const saved = await saveTextOutput(activeDocument.name || "Untitled.txt", activeDocument.content);
+    if (saved) {
+      updateDocument(activeDocument.id, { dirty: false });
+    }
+  }
+
+  async function exportAllDocuments() {
     const content = documents
       .map((document) =>
         [
@@ -327,10 +368,10 @@ function App() {
       )
       .join("\n\n");
 
-    downloadText(`notepad-plus-documents-${Date.now()}.txt`, content);
+    await saveTextOutput(`notepad-plus-documents-${Date.now()}.txt`, content);
   }
 
-  function backupSession() {
+  async function backupSession() {
     const backup: PersistedSession & { exportedAt: string } = {
       documents,
       activeId,
@@ -338,10 +379,10 @@ function App() {
       exportedAt: new Date().toISOString()
     };
 
-    downloadText(
+    await saveTextOutput(
       `notepad-plus-backup-${Date.now()}.json`,
       JSON.stringify(backup, null, 2),
-      "application/json;charset=utf-8"
+      "application/json"
     );
   }
 
@@ -621,7 +662,7 @@ function App() {
   const commands = useMemo<AppCommand[]>(
     () => [
       { id: "new", label: "New document", run: newDocument },
-      { id: "open", label: "Open file", run: () => fileInputRef.current?.click() },
+      { id: "open", label: "Open file", run: openFromDevice },
       { id: "save", label: "Save current document", run: saveActiveDocument },
       { id: "export-all", label: "Export all documents", run: exportAllDocuments },
       { id: "backup", label: "Backup session", run: backupSession },
@@ -721,7 +762,7 @@ function App() {
           <ToolbarGroup label="File">
             <IconButton icon={PanelLeft} label="Documents" onClick={() => updateSettings({ sidebarOpen: !settings.sidebarOpen })} active={settings.sidebarOpen} />
             <IconButton icon={FilePlus2} label="New" onClick={newDocument} />
-            <IconButton icon={FolderOpen} label="Open" onClick={() => fileInputRef.current?.click()} />
+            <IconButton icon={FolderOpen} label="Open" onClick={openFromDevice} />
             <IconButton icon={Save} label="Save" onClick={saveActiveDocument} />
             <IconButton icon={Copy} label="Export all" onClick={exportAllDocuments} />
             <IconButton icon={Save} label="Backup session" onClick={backupSession} />
@@ -812,7 +853,7 @@ function App() {
             onClick={() => updateSettings({ sidebarOpen: !settings.sidebarOpen })}
           />
           <IconButton icon={FilePlus2} label="New" onClick={newDocument} />
-          <IconButton icon={FolderOpen} label="Open" onClick={() => fileInputRef.current?.click()} />
+          <IconButton icon={FolderOpen} label="Open" onClick={openFromDevice} />
           <IconButton icon={Save} label="Save" onClick={saveActiveDocument} />
           <IconButton icon={Command} label="Commands" onClick={() => setCommandOpen(true)} />
           <IconButton
