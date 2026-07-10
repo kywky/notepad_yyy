@@ -647,6 +647,10 @@ button {
     overflow: hidden;
   }
 
+  .app-shell.keyboard-open {
+    grid-template-rows: auto minmax(0, 1fr) 24px;
+  }
+
   .topbar {
     position: relative;
     z-index: 30;
@@ -876,6 +880,14 @@ button {
     background: var(--surface);
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .app-shell.keyboard-open .mobile-actionbar {
+    display: none;
+  }
+
+  .app-shell.keyboard-open .search-panel {
+    bottom: calc(8px + env(safe-area-inset-bottom));
   }
 }
 

@@ -159,6 +159,9 @@ function App() {
   const [searchOptions, setSearchOptions] = useState(initialSearch);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandFilter, setCommandFilter] = useState("");
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const settingsRef = useRef(settings);
+  const commandOpenRef = useRef(commandOpen);
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
@@ -202,6 +205,65 @@ function App() {
     document.documentElement.dataset.theme = settings.theme;
     document.title = `${activeDocument.dirty ? "* " : ""}${activeDocument.name} - ${APP_NAME}`;
   }, [activeDocument.dirty, activeDocument.name, settings.theme]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    commandOpenRef.current = commandOpen;
+  }, [commandOpen]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) {
+      return;
+    }
+
+    const updateKeyboardState = () => {
+      setKeyboardOpen(window.innerHeight - viewport.height > 140);
+    };
+
+    updateKeyboardState();
+    viewport.addEventListener("resize", updateKeyboardState);
+    viewport.addEventListener("scroll", updateKeyboardState);
+    return () => {
+      viewport.removeEventListener("resize", updateKeyboardState);
+      viewport.removeEventListener("scroll", updateKeyboardState);
+    };
+  }, []);
+
+  useEffect(() => {
+    window.history.replaceState({ ...window.history.state, notepadRoot: true }, "");
+    window.history.pushState({ notepadBackGuard: true }, "");
+
+    const handlePopState = () => {
+      const currentSettings = settingsRef.current;
+
+      if (currentSettings.searchOpen) {
+        updateSettings({ searchOpen: false });
+        window.history.pushState({ notepadBackGuard: true }, "");
+        return;
+      }
+
+      if (commandOpenRef.current) {
+        setCommandOpen(false);
+        window.history.pushState({ notepadBackGuard: true }, "");
+        return;
+      }
+
+      if (currentSettings.sidebarOpen) {
+        updateSettings({ sidebarOpen: false });
+        window.history.pushState({ notepadBackGuard: true }, "");
+        return;
+      }
+
+      window.history.back();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -714,7 +776,11 @@ function App() {
       : `${searchResult.matches.length} match${searchResult.matches.length === 1 ? "" : "es"}`;
 
   return (
-    <div className="app-shell" onDragOver={(event) => event.preventDefault()} onDrop={handleDrop}>
+    <div
+      className={`app-shell${keyboardOpen ? " keyboard-open" : ""}`}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
       <input
         ref={fileInputRef}
         className="hidden-file-input"
