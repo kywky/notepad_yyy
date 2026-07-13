@@ -25,6 +25,11 @@ public class NotepadFilesPlugin extends Plugin {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
+        intent.addFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION |
+            Intent.FLAG_GRANT_WRITE_URI_PERMISSION |
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        );
         intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
             "text/*",
             "application/json",
@@ -55,17 +60,10 @@ public class NotepadFilesPlugin extends Plugin {
         }
 
         Uri uri = result.getData().getData();
+        persistUriPermission(result.getData(), uri);
 
-        try (InputStream inputStream = getContext().getContentResolver().openInputStream(uri)) {
-            if (inputStream == null) {
-                call.reject("Could not read selected file.");
-                return;
-            }
-
-            JSObject ret = new JSObject();
-            ret.put("name", getDisplayName(uri));
-            ret.put("content", readText(inputStream));
-            ret.put("uri", uri.toString());
+        try {
+            JSObject ret = readUri(uri);
             call.resolve(ret);
         } catch (Exception error) {
             call.reject("Could not read selected file.", error);
@@ -81,6 +79,11 @@ public class NotepadFilesPlugin extends Plugin {
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType(mimeType);
         intent.putExtra(Intent.EXTRA_TITLE, fileName);
+        intent.addFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION |
+            Intent.FLAG_GRANT_WRITE_URI_PERMISSION |
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+        );
 
         try {
             startActivityForResult(call, intent, "handleSaveTextFile");
@@ -103,6 +106,7 @@ public class NotepadFilesPlugin extends Plugin {
         }
 
         Uri uri = result.getData().getData();
+        persistUriPermission(result.getData(), uri);
         String content = call.getString("content", "");
 
         try (OutputStream outputStream = getContext().getContentResolver().openOutputStream(uri, "wt")) {
@@ -120,6 +124,32 @@ public class NotepadFilesPlugin extends Plugin {
         }
     }
 
+    @PluginMethod
+    public void writeTextFile(PluginCall call) {
+        String uriString = call.getString("uri");
+        if (uriString == null || uriString.trim().isEmpty()) {
+            call.reject("File URI is required.");
+            return;
+        }
+
+        Uri uri = Uri.parse(uriString);
+        String content = call.getString("content", "");
+
+        try (OutputStream outputStream = getContext().getContentResolver().openOutputStream(uri, "wt")) {
+            if (outputStream == null) {
+                call.reject("Could not write file.");
+                return;
+            }
+
+            outputStream.write(content.getBytes(StandardCharsets.UTF_8));
+            JSObject ret = new JSObject();
+            ret.put("uri", uri.toString());
+            call.resolve(ret);
+        } catch (Exception error) {
+            call.reject("Could not write file.", error);
+        }
+    }
+
     private String readText(InputStream inputStream) throws Exception {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         byte[] data = new byte[8192];
@@ -130,6 +160,77 @@ public class NotepadFilesPlugin extends Plugin {
         }
 
         return buffer.toString(StandardCharsets.UTF_8.name());
+    }
+
+    @Override
+    protected void handleOnNewIntent(Intent intent) {
+        JSObject file = readIntentFile(intent);
+        if (file != null) {
+            notifyListeners("openFile", file, true);
+        }
+    }
+
+    private JSObject readIntentFile(Intent intent) {
+        if (intent == null) {
+            return null;
+        }
+
+        String action = intent.getAction();
+        if (Intent.ACTION_VIEW.equals(action) && intent.getData() != null) {
+            try {
+                return readUri(intent.getData());
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+
+        if (Intent.ACTION_SEND.equals(action)) {
+            Uri streamUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (streamUri != null) {
+                try {
+                    return readUri(streamUri);
+                } catch (Exception ignored) {
+                    return null;
+                }
+            }
+
+            CharSequence sharedText = intent.getCharSequenceExtra(Intent.EXTRA_TEXT);
+            if (sharedText != null) {
+                JSObject ret = new JSObject();
+                ret.put("name", "Shared.txt");
+                ret.put("content", sharedText.toString());
+                return ret;
+            }
+        }
+
+        return null;
+    }
+
+    private JSObject readUri(Uri uri) throws Exception {
+        try (InputStream inputStream = getContext().getContentResolver().openInputStream(uri)) {
+            if (inputStream == null) {
+                throw new IllegalStateException("Input stream is not available.");
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("name", getDisplayName(uri));
+            ret.put("content", readText(inputStream));
+            ret.put("uri", uri.toString());
+            return ret;
+        }
+    }
+
+    private void persistUriPermission(Intent data, Uri uri) {
+        int flags = data.getFlags() &
+            (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+
+        if (flags == 0) {
+            return;
+        }
+
+        try {
+            getContext().getContentResolver().takePersistableUriPermission(uri, flags);
+        } catch (SecurityException ignored) {}
     }
 
     private String getDisplayName(Uri uri) {

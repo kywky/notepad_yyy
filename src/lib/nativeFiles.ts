@@ -1,6 +1,6 @@
-import { Capacitor, registerPlugin } from "@capacitor/core";
+import { Capacitor, registerPlugin, type PluginListenerHandle } from "@capacitor/core";
 
-type OpenTextFileResult = {
+export type NativeTextFile = {
   cancelled?: boolean;
   name?: string;
   content?: string;
@@ -18,9 +18,19 @@ type SaveTextFileResult = {
   uri?: string;
 };
 
+type WriteTextFileOptions = {
+  uri: string;
+  content: string;
+};
+
 type NotepadFilesPlugin = {
-  openTextFile: () => Promise<OpenTextFileResult>;
+  openTextFile: () => Promise<NativeTextFile>;
   saveTextFile: (options: SaveTextFileOptions) => Promise<SaveTextFileResult>;
+  writeTextFile: (options: WriteTextFileOptions) => Promise<{ uri: string }>;
+  addListener: (
+    eventName: "openFile",
+    listenerFunc: (file: NativeTextFile) => void
+  ) => Promise<PluginListenerHandle>;
 };
 
 const NotepadFiles = registerPlugin<NotepadFilesPlugin>("NotepadFiles");
@@ -46,6 +56,14 @@ export async function openNativeTextFile() {
   };
 }
 
+export async function listenForNativeOpenFile(listener: (file: NativeTextFile) => void) {
+  if (!hasNativeFilePicker()) {
+    return null;
+  }
+
+  return NotepadFiles.addListener("openFile", listener);
+}
+
 export async function saveNativeTextFile(options: SaveTextFileOptions) {
   if (!hasNativeFilePicker()) {
     return null;
@@ -57,4 +75,12 @@ export async function saveNativeTextFile(options: SaveTextFileOptions) {
   });
 
   return result.cancelled ? null : result;
+}
+
+export async function writeNativeTextFile(options: WriteTextFileOptions) {
+  if (!hasNativeFilePicker()) {
+    return null;
+  }
+
+  return NotepadFiles.writeTextFile(options);
 }

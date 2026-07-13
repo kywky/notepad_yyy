@@ -54,7 +54,14 @@ import {
   type SearchOptions
 } from "./lib/search";
 import { APP_NAME } from "./lib/platform";
-import { hasNativeFilePicker, openNativeTextFile, saveNativeTextFile } from "./lib/nativeFiles";
+import {
+  hasNativeFilePicker,
+  listenForNativeOpenFile,
+  openNativeTextFile,
+  saveNativeTextFile,
+  writeNativeTextFile,
+  type NativeTextFile
+} from "./lib/nativeFiles";
 
 type IconButtonProps = {
   label: string;
@@ -215,6 +222,35 @@ function App() {
   }, [commandOpen]);
 
   useEffect(() => {
+    let active = true;
+    let removeListener: (() => Promise<void>) | null = null;
+
+    void listenForNativeOpenFile((file) => {
+      if (active) {
+        addNativeDocument(file);
+      }
+    })
+      .then((handle) => {
+        if (!handle) {
+          return;
+        }
+
+        if (!active) {
+          void handle.remove();
+          return;
+        }
+
+        removeListener = () => handle.remove();
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+      void removeListener?.();
+    };
+  }, []);
+
+  useEffect(() => {
     const viewport = window.visualViewport;
     if (!viewport) {
       return;
@@ -277,7 +313,11 @@ function App() {
 
       if (key === "s") {
         event.preventDefault();
-        void saveActiveDocument();
+        if (event.shiftKey) {
+          void saveActiveDocumentAs();
+        } else {
+          void saveActiveDocument();
+        }
       }
 
       if (key === "o") {
@@ -380,18 +420,27 @@ function App() {
         return;
       }
 
-      const document = createDocument({
-        name: file.name,
-        content: file.content,
-        dirty: false,
-        language: detectLanguage(file.name)
-      });
-      setDocuments((current) => [...current, document]);
-      setActiveId(document.id);
-      setTimeout(() => editorRef.current?.focus(), 0);
+      addNativeDocument(file);
     } catch {
       window.alert("Could not open file.");
     }
+  }
+
+  function addNativeDocument(file: NativeTextFile) {
+    if (!file.name || file.content === undefined) {
+      return;
+    }
+
+    const document = createDocument({
+      name: file.name,
+      content: file.content,
+      dirty: false,
+      language: detectLanguage(file.name),
+      nativeUri: file.uri
+    });
+    setDocuments((current) => [...current, document]);
+    setActiveId(document.id);
+    setTimeout(() => editorRef.current?.focus(), 0);
   }
 
   async function saveTextOutput(fileName: string, content: string, type = "text/plain;charset=utf-8") {
@@ -399,21 +448,44 @@ function App() {
       try {
         const mimeType = type.split(";")[0] || "text/plain";
         const result = await saveNativeTextFile({ fileName, content, mimeType });
-        return Boolean(result);
+        return { saved: Boolean(result), uri: result?.uri };
       } catch {
         window.alert("Could not save file.");
-        return false;
+        return { saved: false };
       }
     }
 
     downloadText(fileName, content, type);
-    return true;
+    return { saved: true };
   }
 
   async function saveActiveDocument() {
-    const saved = await saveTextOutput(activeDocument.name || "Untitled.txt", activeDocument.content);
-    if (saved) {
-      updateDocument(activeDocument.id, { dirty: false });
+    if (activeDocument.nativeUri && hasNativeFilePicker()) {
+      try {
+        await writeNativeTextFile({
+          uri: activeDocument.nativeUri,
+          content: activeDocument.content
+        });
+        updateDocument(activeDocument.id, { dirty: false });
+        return;
+      } catch {
+        window.alert("The original file is unavailable. Choose a new save location.");
+      }
+    }
+
+    await saveActiveDocumentAs();
+  }
+
+  async function saveActiveDocumentAs() {
+    const result = await saveTextOutput(
+      activeDocument.name || "Untitled.txt",
+      activeDocument.content
+    );
+    if (result.saved) {
+      updateDocument(activeDocument.id, {
+        dirty: false,
+        nativeUri: result.uri ?? activeDocument.nativeUri
+      });
     }
   }
 
@@ -726,6 +798,7 @@ function App() {
       { id: "new", label: "New document", run: newDocument },
       { id: "open", label: "Open file", run: openFromDevice },
       { id: "save", label: "Save current document", run: saveActiveDocument },
+      { id: "save-as", label: "Save current document as", run: saveActiveDocumentAs },
       { id: "export-all", label: "Export all documents", run: exportAllDocuments },
       { id: "backup", label: "Backup session", run: backupSession },
       { id: "restore", label: "Restore session", run: () => backupInputRef.current?.click() },

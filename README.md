@@ -54,6 +54,8 @@ For Android use, build the APK and copy the generated APK to the target phone.
 
 This project is configured with Capacitor Android.
 The APK uses Android's system file picker for opening and saving text files.
+It can also receive text files from Android "Open with" and "Share" flows.
+Files opened through the system picker can be saved back directly; use Save As to choose a new location.
 
 Sync the web build into the Android project:
 
