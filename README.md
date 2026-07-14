@@ -2,6 +2,10 @@
 
 一个面向手机 APK 的轻量文本编辑器。当前版本使用 Vite、React、TypeScript、CodeMirror 和 Capacitor 构建。
 
+当前项目状态、架构、打包流程、卓易通注意事项和后续计划见：
+
+[项目交接文档](docs/PROJECT_HANDOFF.md)
+
 ## Local Development
 
 ```sh
