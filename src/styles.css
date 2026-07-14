@@ -223,6 +223,95 @@ button {
   cursor: not-allowed;
 }
 
+.touch-tooltip {
+  position: fixed;
+  z-index: 100;
+  max-width: min(220px, calc(100vw - 16px));
+  padding: 6px 9px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.25;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.more-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+}
+
+.more-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(12, 18, 26, 0.4);
+}
+
+.more-sheet {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 0 8px calc(8px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 -12px 30px rgba(24, 33, 47, 0.16);
+}
+
+.more-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 0 2px 0 4px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.more-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.more-actions button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 42px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.more-actions button:active {
+  background: var(--surface-3);
+}
+
+.more-actions button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-actions button.is-danger {
+  color: var(--danger);
+}
+
 .compact-field {
   display: inline-flex;
   align-items: center;

@@ -6,6 +6,7 @@ import {
   ChevronUp,
   Command,
   Copy,
+  Ellipsis,
   FilePlus2,
   FileText,
   FolderOpen,
@@ -35,8 +36,11 @@ import {
   type ChangeEvent,
   type DragEvent,
   type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
   type ReactNode
 } from "react";
+import { createPortal } from "react-dom";
 import CodeEditor, { type CodeEditorHandle, type CursorInfo } from "./components/CodeEditor";
 import { detectLanguage, languageOptions, type LanguageId } from "./lib/languages";
 import {
@@ -94,18 +98,127 @@ const initialSearch: SearchOptions = {
   wholeWord: false
 };
 
+const iconDescriptions: Record<string, string> = {
+  "Backup session": "备份会话",
+  "Close commands": "关闭",
+  "Close search": "关闭搜索",
+  Commands: "命令列表",
+  "Delete line": "删除当前行",
+  Documents: "文档列表",
+  "Duplicate line": "复制当前行",
+  "Export all": "导出全部文档",
+  Find: "查找替换",
+  Lowercase: "转换为小写",
+  "Match case": "区分大小写",
+  "Move line down": "当前行下移",
+  "Move line up": "当前行上移",
+  "More actions": "更多编辑操作",
+  New: "新建文档",
+  Open: "打开文件",
+  Redo: "重做",
+  "Regular expression": "正则表达式",
+  "Remove duplicate lines": "去除重复行",
+  Replace: "替换",
+  "Restore backup": "恢复备份",
+  Save: "保存文件",
+  "Sort lines": "行排序",
+  Theme: "切换主题",
+  "Trim trailing spaces": "清理行尾空格",
+  Undo: "撤销",
+  Uppercase: "转换为大写",
+  "Whole word": "全词匹配",
+  "Word wrap": "自动换行"
+};
+
 function IconButton({ label, icon: Icon, onClick, active, disabled }: IconButtonProps) {
+  const description = iconDescriptions[label] ?? label;
+  const pressTimerRef = useRef<number | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const longPressRef = useRef(false);
+  const [tooltip, setTooltip] = useState<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pressTimerRef.current !== null) {
+        window.clearTimeout(pressTimerRef.current);
+      }
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current);
+      }
+    };
+  }, []);
+
+  function clearPressTimer() {
+    if (pressTimerRef.current !== null) {
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === "mouse" || disabled) {
+      return;
+    }
+
+    clearPressTimer();
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+    setTooltip(null);
+    longPressRef.current = false;
+    const rect = event.currentTarget.getBoundingClientRect();
+    pressTimerRef.current = window.setTimeout(() => {
+      longPressRef.current = true;
+      setTooltip({
+        left: Math.min(window.innerWidth - 64, Math.max(64, rect.left + rect.width / 2)),
+        top: rect.top > 48 ? rect.top - 38 : rect.bottom + 8
+      });
+      navigator.vibrate?.(12);
+      hideTimerRef.current = window.setTimeout(() => setTooltip(null), 1400);
+    }, 420);
+  }
+
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
+    if (longPressRef.current) {
+      event.preventDefault();
+      longPressRef.current = false;
+      return;
+    }
+
+    onClick();
+  }
+
   return (
-    <button
-      aria-label={label}
-      className={`icon-button${active ? " is-active" : ""}`}
-      disabled={disabled}
-      onClick={onClick}
-      title={label}
-      type="button"
-    >
-      <Icon size={17} strokeWidth={2} />
-    </button>
+    <>
+      <button
+        aria-label={description}
+        className={`icon-button${active ? " is-active" : ""}`}
+        disabled={disabled}
+        onClick={handleClick}
+        onContextMenu={(event) => event.preventDefault()}
+        onPointerCancel={clearPressTimer}
+        onPointerDown={handlePointerDown}
+        onPointerLeave={clearPressTimer}
+        onPointerUp={clearPressTimer}
+        title={description}
+        type="button"
+      >
+        <Icon size={17} strokeWidth={2} />
+      </button>
+      {tooltip
+        ? createPortal(
+            <div
+              className="touch-tooltip"
+              role="status"
+              style={{ left: tooltip.left, top: tooltip.top }}
+            >
+              {description}
+            </div>,
+            document.body
+          )
+        : null}
+    </>
   );
 }
 
@@ -165,10 +278,12 @@ function App() {
   const [cursor, setCursor] = useState(initialCursor);
   const [searchOptions, setSearchOptions] = useState(initialSearch);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [commandFilter, setCommandFilter] = useState("");
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const settingsRef = useRef(settings);
   const commandOpenRef = useRef(commandOpen);
+  const moreOpenRef = useRef(moreOpen);
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const backupInputRef = useRef<HTMLInputElement | null>(null);
@@ -220,6 +335,10 @@ function App() {
   useEffect(() => {
     commandOpenRef.current = commandOpen;
   }, [commandOpen]);
+
+  useEffect(() => {
+    moreOpenRef.current = moreOpen;
+  }, [moreOpen]);
 
   useEffect(() => {
     let active = true;
@@ -284,6 +403,12 @@ function App() {
 
       if (commandOpenRef.current) {
         setCommandOpen(false);
+        window.history.pushState({ notepadBackGuard: true }, "");
+        return;
+      }
+
+      if (moreOpenRef.current) {
+        setMoreOpen(false);
         window.history.pushState({ notepadBackGuard: true }, "");
         return;
       }
@@ -781,6 +906,12 @@ function App() {
     }, true);
   }
 
+  function runMoreAction(action: () => unknown) {
+    action();
+    setMoreOpen(false);
+    setTimeout(() => editorRef.current?.focus(), 0);
+  }
+
   function handleSearchKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -1136,6 +1267,61 @@ function App() {
         </section>
       ) : null}
 
+      {moreOpen ? (
+        <section className="more-panel" aria-label="更多编辑操作">
+          <button
+            aria-label="关闭更多操作"
+            className="more-scrim"
+            onClick={() => setMoreOpen(false)}
+            type="button"
+          />
+          <div className="more-sheet" role="dialog" aria-modal="true">
+            <div className="more-header">
+              <strong>更多编辑操作</strong>
+              <IconButton icon={X} label="Close commands" onClick={() => setMoreOpen(false)} />
+            </div>
+            <div className="more-actions">
+              <button onClick={() => runMoreAction(() => transformSelection((value) => value.toUpperCase()))} type="button">
+                <ChevronUp size={18} />
+                <span>转换为大写</span>
+              </button>
+              <button onClick={() => runMoreAction(() => transformSelection((value) => value.toLowerCase()))} type="button">
+                <ChevronDown size={18} />
+                <span>转换为小写</span>
+              </button>
+              <button onClick={() => runMoreAction(duplicateLine)} type="button">
+                <Copy size={18} />
+                <span>复制当前行</span>
+              </button>
+              <button className="is-danger" onClick={() => runMoreAction(deleteLine)} type="button">
+                <Trash2 size={18} />
+                <span>删除当前行</span>
+              </button>
+              <button onClick={() => runMoreAction(() => moveLine("up"))} type="button">
+                <ArrowUp size={18} />
+                <span>当前行上移</span>
+              </button>
+              <button onClick={() => runMoreAction(() => moveLine("down"))} type="button">
+                <ArrowDown size={18} />
+                <span>当前行下移</span>
+              </button>
+              <button onClick={() => runMoreAction(sortSelectedLines)} type="button">
+                <SortAsc size={18} />
+                <span>行排序</span>
+              </button>
+              <button onClick={() => runMoreAction(removeDuplicateLines)} type="button">
+                <List size={18} />
+                <span>去除重复行</span>
+              </button>
+              <button onClick={() => runMoreAction(trimTrailingWhitespace)} type="button">
+                <List size={18} />
+                <span>清理行尾空格</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <main className={`workspace${settings.sidebarOpen ? " has-sidebar" : ""}`}>
         {settings.sidebarOpen ? (
           <button
@@ -1242,21 +1428,13 @@ function App() {
       <nav className="mobile-actionbar" aria-label="Editor actions">
         <IconButton icon={Undo2} label="Undo" onClick={() => editorRef.current?.undo()} />
         <IconButton icon={Redo2} label="Redo" onClick={() => editorRef.current?.redo()} />
-        <IconButton
-          icon={ChevronUp}
-          label="Uppercase"
-          onClick={() => transformSelection((value) => value.toUpperCase())}
-        />
-        <IconButton
-          icon={ChevronDown}
-          label="Lowercase"
-          onClick={() => transformSelection((value) => value.toLowerCase())}
-        />
-        <IconButton icon={Copy} label="Duplicate line" onClick={duplicateLine} />
-        <IconButton icon={Trash2} label="Delete line" onClick={deleteLine} />
         <IconButton icon={Command} label="Commands" onClick={() => setCommandOpen(true)} />
-        <IconButton icon={SortAsc} label="Sort lines" onClick={sortSelectedLines} />
-        <IconButton icon={List} label="Trim trailing spaces" onClick={trimTrailingWhitespace} />
+        <IconButton
+          active={moreOpen}
+          icon={Ellipsis}
+          label="More actions"
+          onClick={() => setMoreOpen(true)}
+        />
       </nav>
     </div>
   );

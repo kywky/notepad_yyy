@@ -12,6 +12,9 @@ permissions:
 jobs:
   build-debug-apk:
     runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 0.3.${{ github.run_number }}
 
     steps:
       - name: Checkout
@@ -31,6 +34,27 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Restore stable test signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: notepad-plus-debug-keystore-v1
+
+      - name: Create test signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore "$HOME/.android/debug.keystore" \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname "CN=Notepad Plus Test,O=kywky,C=CN" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
 
       - name: Install Android SDK packages
         run: |
@@ -59,7 +83,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: debug-latest
-          name: Debug APK
+          name: Compatibility Test APK
           prerelease: true
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
