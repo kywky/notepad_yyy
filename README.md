@@ -81,5 +81,5 @@ android/app/build/outputs/apk/debug/app-debug.apk
 最新测试 APK：
 
 ```txt
-https://github.com/kywky/notepad_yyy/releases/download/debug-latest/app-debug.apk
+https://github.com/kywky/notepad_yyy/releases/latest/download/app-debug.apk
 ```

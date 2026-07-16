@@ -79,16 +79,6 @@ jobs:
           name: notepad-plus-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Remove previous release APK
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          asset_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/debug-latest" \
-            --jq '.assets[] | select(.name == "app-debug.apk") | .id' 2>/dev/null || true)"
-          if [ -n "$asset_id" ]; then
-            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
-          fi
-
       - name: Publish debug release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -106,16 +96,8 @@ jobs:
               return "$status"
             fi
           }
-          if curl --fail --silent --show-error \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/debug-latest" \
-            >/dev/null; then
-            publish gh release upload debug-latest \
-              android/app/build/outputs/apk/debug/app-debug.apk \
-              --clobber
-          else
-            publish gh release create debug-latest \
-              android/app/build/outputs/apk/debug/app-debug.apk \
-              --target "$GITHUB_SHA" \
-              --title "Compatibility Test APK" \
-              --prerelease
-          fi
+          publish gh release create "debug-${GITHUB_RUN_NUMBER}" \
+            android/app/build/outputs/apk/debug/app-debug.apk \
+            --target "$GITHUB_SHA" \
+            --title "Compatibility Test APK ${VERSION_NAME}" \
+            --latest

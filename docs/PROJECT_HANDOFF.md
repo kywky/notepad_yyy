@@ -213,7 +213,7 @@ npm run android:apk
 最新 APK：
 
 ```txt
-https://github.com/kywky/notepad_yyy/releases/download/debug-latest/app-debug.apk
+https://github.com/kywky/notepad_yyy/releases/latest/download/app-debug.apk
 ```
 
 本机下载位置：
