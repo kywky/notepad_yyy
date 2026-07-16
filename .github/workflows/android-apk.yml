@@ -106,7 +106,7 @@ jobs:
               return "$status"
             fi
           }
-          if gh release view debug-latest >/dev/null 2>&1; then
+          if gh api "repos/${GITHUB_REPOSITORY}/releases/tags/debug-latest" >/dev/null 2>&1; then
             publish gh release upload debug-latest \
               android/app/build/outputs/apk/debug/app-debug.apk \
               --clobber
