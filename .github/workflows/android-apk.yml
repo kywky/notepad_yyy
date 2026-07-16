@@ -91,14 +91,27 @@ jobs:
 
       - name: Publish debug release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          publish() {
+            set +e
+            output="$("$@" 2>&1)"
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              output="${output//'%'/'%25'}"
+              output="${output//$'\n'/'%0A'}"
+              output="${output//$'\r'/'%0D'}"
+              echo "::error title=APK release failed::$output"
+              return "$status"
+            fi
+          }
           if gh release view debug-latest >/dev/null 2>&1; then
-            gh release upload debug-latest \
+            publish gh release upload debug-latest \
               android/app/build/outputs/apk/debug/app-debug.apk \
               --clobber
           else
-            gh release create debug-latest \
+            publish gh release create debug-latest \
               android/app/build/outputs/apk/debug/app-debug.apk \
               --target "$GITHUB_SHA" \
               --title "Compatibility Test APK" \
