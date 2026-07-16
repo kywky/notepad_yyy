@@ -1,346 +1,256 @@
-# Notepad+ Project Handoff
+# Notepad+ 项目交接文档
 
-Last updated: 2026-07-15
+更新时间：2026-07-17
 
-## 中文快速交接
+## 项目目标
 
-当前项目已经从网页版 PWA 调整为以 Android APK 为主要交付目标的轻量文本编辑器。
+这是一个安卓端轻量日志与文本编辑器，参考 Notepad++ 的核心使用方式，但主动减少复杂功能。
 
-目前已完成：
+主要使用场景：
 
-- 多标签文本编辑、语法高亮、搜索替换和常用行操作
-- Android 系统文件选择、另存为和原文件直接覆盖保存
-- 从文件管理器“打开方式”以及其他应用“分享”进入 Notepad+
-- 移动端返回键、软键盘、小屏布局和底部工具栏适配
-- 图标桌面悬停说明、手机长按中文说明以及“更多编辑操作”菜单
-- GitHub Actions 自动构建 APK、发布 `debug-latest` 并自动更新版本号
-- 卓易通兼容测试配置：`targetSdk 35` 和可复用测试签名缓存
+- 查看手机上的日志文件
+- 文件可能没有后缀，或者使用未知后缀
+- 简单修改日志或文本内容
+- 查找、替换并高亮匹配结果
+- 新建和保存普通文本文件
 
-当前基线提交是 `4a8f55c`。旧 APK 与这版测试签名不同，在卓易通中需要先卸载旧版一次再安装。当前 APK 仍属于测试包，正式发布前必须改成 GitHub Secrets 管理的永久 release 签名。
+当前不计划加入云同步、账号、插件系统、AI、复杂语法分析、工程目录或高级代码重构功能。
 
-下一步优先做真机和卓易通完整测试，然后处理正式签名、保存提示、大文件保护和编码检测。
+## 当前基线
 
-## 1. Project Summary
-
-Notepad+ is a lightweight mobile text editor inspired by Notepad++. The main delivery target is an Android APK rather than a browser/PWA product.
-
-Project principles:
-
-- Keep the interface compact and leave most of the screen to the editor.
-- Prefer practical editing and file operations over decorative or complex features.
-- Support phones first, including small screens, soft keyboards, and Android back behavior.
-- Avoid cloud accounts, AI features, plugin marketplaces, and other heavy functionality for now.
-
-Repository:
+仓库：
 
 ```txt
 https://github.com/kywky/notepad_yyy.git
 ```
 
-Local project path:
+本地目录：
 
 ```txt
 /data/data/com.termux/files/home/test/nodeyyy
 ```
 
-Current baseline commit:
+安卓包名：
 
 ```txt
-4a8f55c Add mobile tooltips and compatibility build
+com.kywky.notepadyyy
 ```
 
-## 2. Technology Stack
+技术栈：
 
-- React 19 and TypeScript
-- Vite 7
+- React 19
+- TypeScript
+- Vite
 - CodeMirror 6
-- Capacitor 8 Android shell
-- Lucide React icons
-- GitHub Actions for APK builds
+- Capacitor 8
+- Lucide 图标
 
-Android configuration:
+Android 配置：
 
-- Application ID: `com.kywky.notepadyyy`
-- Application name: `Notepad+`
-- Minimum SDK: 24
-- Compile SDK: 36
-- Target SDK: 35
-- Current package type: debug/compatibility test APK
+- minSdk 24
+- compileSdk 36
+- targetSdk 35
+- GitHub Actions 自动构建兼容测试 APK
 
-## 3. Main Source Files
+## 已保留功能
+
+### 文件
+
+- 新建文本
+- Android 系统文件选择器打开文件
+- 不限制文件后缀和 MIME 类型
+- 支持未知后缀、无后缀和 `application/octet-stream`
+- 支持 Android“打开方式”
+- 支持从其他应用分享文字或文件
+- 保存到原文件
+- 另存为新位置
+- 原文件权限失效时自动回退到另存为
+- 浏览器开发模式使用下载文件作为保存兜底
+
+### 编辑
+
+- 多标签文档
+- 行号
+- 撤销和重做
+- 自动换行
+- 字体大小调整
+- 明暗主题
+- 光标行列、行数、字符数、换行格式和保存状态
+- 会话自动保存和恢复
+
+### 查找替换
+
+- 普通文本查找
+- 区分大小写
+- 上一个和下一个匹配
+- 替换当前匹配
+- 全部替换
+- 所有匹配结果高亮
+- 当前匹配使用更明显的高亮颜色
+
+### 手机体验
+
+- 紧凑顶部工具栏
+- 图标桌面悬停说明
+- 手机长按图标显示中文说明
+- Android 返回键优先关闭查找面板
+- 软键盘弹出时隐藏状态栏，为编辑区让出空间
+- 横向滚动工具栏和标签栏
+
+## 已删除的复杂功能
+
+- 命令面板
+- 文档侧边栏
+- 会话备份和恢复入口
+- 导出全部文档
+- 手动语言选择
+- JavaScript、HTML、CSS、JSON、Markdown、Python、XML 等语法插件
+- 自动补全
+- 代码折叠
+- 括号匹配
+- 多光标和矩形选择
+- 大小写转换
+- 行排序
+- 去除重复行
+- 行上移和下移
+- 清理行尾空格
+- 底部复杂操作栏和更多菜单
+
+移除后，前端 JavaScript 构建体积从约 886 KB 降到约 504 KB，CSS 从约 14.5 KB 降到约 6.1 KB。
+
+## 关键文件
 
 ```txt
 src/App.tsx
 ```
 
-Main application state, tabs, editor commands, search, file operations, mobile panels, back handling, keyboard handling, tooltips, and the mobile More menu.
+主界面、标签、文件操作、查找替换、快捷键、主题和移动端行为。
 
 ```txt
 src/components/CodeEditor.tsx
 ```
 
-CodeMirror initialization, themes, language extensions, editor commands, selections, and cursor reporting.
+精简后的 CodeMirror 配置和查找结果装饰高亮。
 
 ```txt
 src/lib/session.ts
 ```
 
-Session persistence, document model, settings model, and native document URI persistence.
+文档和设置模型、会话持久化、Android 文件 URI。
+
+```txt
+src/lib/search.ts
+```
+
+查找和替换纯函数。
 
 ```txt
 src/lib/nativeFiles.ts
 ```
 
-TypeScript bridge for native Android file open, save, direct write, and incoming shared files.
+前端与 Android 原生文件插件之间的桥接。
 
 ```txt
 android/app/src/main/java/com/kywky/notepadyyy/NotepadFilesPlugin.java
 ```
 
-Custom Capacitor Android plugin based on the Android Storage Access Framework.
+Android 文件选择、读取、保存、直接写回和分享接收。
 
-```txt
-android/app/src/main/AndroidManifest.xml
-```
+## 文档数据模型
 
-Android activity configuration, soft keyboard resize behavior, and Open With/Share intent filters.
+每个标签保存：
 
-```txt
-.github/workflows/android-apk.yml
-```
+- `id`
+- `name`
+- `content`
+- `nativeUri`，可选
+- `dirty`
+- `createdAt`
+- `updatedAt`
 
-GitHub Actions APK build, test signing key cache, artifact upload, and `debug-latest` release publishing.
+编辑器设置只保留：
 
-## 4. Completed Features
+- `theme`
+- `lineWrapping`
+- `fontSize`
 
-### Editor
+旧会话中多余的语言、侧栏和搜索设置字段会被忽略。
 
-- Multiple documents and tabs
-- Document sidebar
-- Syntax highlighting for plain text, JavaScript, TypeScript, HTML, CSS, JSON, Markdown, Python, XML, and shell files
-- Search and replace
-- Regex, case-sensitive, and whole-word search
-- Undo and redo
-- Word wrap
-- Font size and tab size settings
-- Duplicate and delete line
-- Move line up and down
-- Uppercase and lowercase conversion
-- Line sorting
-- Duplicate-line removal
-- Trailing-space cleanup
-- Session persistence in local storage
+## 开发和构建
 
-### Mobile UI
-
-- Compact top toolbar and editor-first layout
-- Mobile quick actions and bottom editor actions
-- Android back button closes search, command panel, More panel, and document sidebar before exiting
-- Soft keyboard resize handling using `adjustResize` and `visualViewport`
-- Bottom editor bar hides while the soft keyboard is open
-- Long-press icon descriptions on touch devices
-- Desktop icon descriptions through normal hover titles
-- Low-frequency edit operations grouped into a Chinese-labeled More menu
-
-### Android File Support
-
-- Open files through Android's system file picker
-- Save files through Android's system save dialog
-- Persist document URIs where the provider allows it
-- Save an opened file directly back to its original URI
-- Save As through `Ctrl+Shift+S` and the command list
-- Fall back to Save As if the original URI is no longer writable
-- Receive text files through Android Open With
-- Receive shared text or shared text-file streams
-- No broad storage permission is requested
-
-### Browser/PWA Cleanup
-
-- PWA install prompts removed
-- Service Worker registration removed
-- Web manifest and PWA cache files removed
-- APK name and UI use `Notepad+`, without `Web` branding
-- Browser development mode remains available as a fallback environment
-
-## 5. Data and Saving Behavior
-
-Each document stores:
-
-- ID
-- File name
-- Text content
-- Language mode
-- Dirty state
-- Creation/update timestamps
-- Optional Android `nativeUri`
-
-Behavior:
-
-- A file opened through Android stores its URI in the session.
-- Normal Save writes directly to that URI.
-- A new document opens the Android Save As dialog on first save.
-- Save As updates the document with the newly selected URI.
-- If URI permission is lost, the app informs the user and opens Save As.
-- Browser development mode downloads files using Blob URLs.
-
-The current local-storage key is:
-
-```txt
-notepad-plus-session-v1
-```
-
-The old `notepad-plus-web-session-v1` key is read as a migration fallback.
-
-## 6. Local Development
-
-Install dependencies:
+安装依赖：
 
 ```sh
 npm install
 ```
 
-Start the Vite development server:
+开发服务器：
 
 ```sh
 npm run dev
 ```
 
-Build the frontend:
+前端构建：
 
 ```sh
 npm run build
 ```
 
-Build and sync frontend assets into Android:
+同步 Android：
 
 ```sh
 npm run android:sync
 ```
 
-Local APK command:
+本地 APK：
 
 ```sh
 npm run android:apk
 ```
 
-The current Termux environment does not have Java/Android SDK configured, so local Gradle APK builds fail unless `java` and `JAVA_HOME` are installed. GitHub Actions is the normal APK build route.
+当前 Termux 没有配置 Java 和 Android SDK，通常使用 GitHub Actions 打包。
 
-## 7. GitHub Actions and APK Delivery
-
-Every push to `main` runs the `Android APK` workflow.
-
-Workflow behavior:
-
-- Uses Node.js 22 and Java 21
-- Installs Android platform/build tools 36
-- Runs `npm ci`
-- Runs `npm run android:sync`
-- Runs `./gradlew assembleDebug`
-- Uploads artifact `notepad-plus-debug-apk`
-- Updates release tag `debug-latest`
-- Sets `versionCode` to the GitHub run number
-- Sets `versionName` to `0.3.<run number>`
-
-Latest APK URL:
+最新 APK：
 
 ```txt
 https://github.com/kywky/notepad_yyy/releases/download/debug-latest/app-debug.apk
 ```
 
-Local downloaded APK:
+本机下载位置：
 
 ```txt
 /data/data/com.termux/files/home/notepad_yyy_apk/app-debug.apk
 ```
 
-SHA-256 for the build produced from commit `4a8f55c`:
+## 卓易通注意事项
 
-```txt
-ba6e862e078ab9128d2a46bdd2428c6d5ff95afb8037e09034102a0aecfbd870
-```
+- 当前是兼容测试 APK，不是正式 release 包。
+- targetSdk 已降到 35。
+- GitHub Actions 使用缓存测试签名，旧签名 APK 需要卸载一次。
+- 后续正式分发必须使用 GitHub Secrets 保存永久 release 签名。
+- 鸿蒙 NEXT 是否可用仍取决于卓易通自身的 APK 兼容和安装策略。
 
-## 8. Signing and HarmonyOS/Zhuoyi Compatibility
+## 已知限制
 
-The APK is currently a compatibility test build, not a production release.
+- 所有文件都按 UTF-8 文本读取，二进制文件可能显示乱码。
+- 暂未检测 GBK、UTF-16 等编码。
+- 暂未对超大日志文件做内存保护。
+- 文件内容一次性读入内存，不适合数百 MB 的日志。
+- 尚无自动化 UI 测试。
+- 查找只保留普通文本和区分大小写，没有正则表达式。
+- 测试签名依赖 GitHub Actions cache，不适合作为长期正式签名。
 
-The workflow caches `~/.android/debug.keystore` with cache key:
+## 推荐下一步
 
-```txt
-notepad-plus-debug-keystore-v1
-```
+1. 在普通 Android 和卓易通中测试任意后缀文件打开。
+2. 测试无后缀日志、较大日志、直接保存和另存为。
+3. 增加文件大小提示，例如超过 20 MB 时提醒用户。
+4. 增加 UTF-8 BOM、UTF-16 和 GBK 编码检测。
+5. 使用轻量 toast 替代 `window.alert`。
+6. 配置永久 release 签名。
+7. 添加搜索和会话迁移单元测试。
 
-This gives test builds a reusable signature while the GitHub Actions cache exists. APKs built before this signing setup use a different signature.
-
-For Zhuoyi/卓易通 testing:
-
-1. Back up any important text from the old installation.
-2. Uninstall the APK installed before commit `4a8f55c` once.
-3. Install the APK built from `4a8f55c` or later as a fresh install.
-4. Future compatibility test APKs should update normally while the signing cache is retained.
-
-Important limitation:
-
-- GitHub Actions cache is not a permanent production signing solution.
-- Cache deletion or expiration can change the test signature.
-- A proper release keystore stored in GitHub Secrets is required before public distribution.
-- HarmonyOS NEXT does not natively run arbitrary Android APKs; final compatibility still depends on Zhuoyi's container rules.
-
-## 9. Download Troubleshooting
-
-In Termux, direct `curl` downloads from GitHub Release CDN have occasionally failed with TLS errors even when the GitHub API works.
-
-Primary download:
-
-```sh
-curl -fL --retry 5 -o app-debug.apk \
-  https://github.com/kywky/notepad_yyy/releases/download/debug-latest/app-debug.apk
-```
-
-Node.js fallback:
-
-```sh
-node -e "const fs=require('fs'); fetch('https://github.com/kywky/notepad_yyy/releases/download/debug-latest/app-debug.apk').then(r=>{if(!r.ok)throw new Error(String(r.status));return r.arrayBuffer()}).then(b=>fs.writeFileSync('app-debug.apk',Buffer.from(b)))"
-```
-
-Validation:
-
-```sh
-sha256sum app-debug.apk
-unzip -t app-debug.apk
-```
-
-## 10. Known Limitations
-
-- The APK still uses a Capacitor WebView internally; the visible PWA/browser behavior has been removed.
-- The JavaScript bundle is about 886 KB because all CodeMirror language packages are bundled together.
-- No automated browser or Android UI tests exist.
-- Long-press tooltips and the More menu still require broad real-device testing.
-- Large files have no size limit and can consume too much memory.
-- Files are decoded and written as UTF-8; other encodings are not detected.
-- Incoming Open With permissions may be temporary depending on the sending application/provider.
-- Shared binary or invalid files are not rejected explicitly.
-- Save success currently has no lightweight toast notification.
-- Most UI command text is still English outside the mobile More menu and touch descriptions.
-- Production release signing is not configured.
-
-## 11. Recommended Next Work
-
-Priority order:
-
-1. Test the current APK on Android and 卓易通: fresh install, update, open, direct save, Save As, Share, back button, and soft keyboard.
-2. Replace cached debug signing with a permanent release keystore stored in GitHub Secrets.
-3. Add small non-blocking save/error notifications instead of browser alerts.
-4. Add a configurable large-file warning and disable expensive syntax highlighting for large files.
-5. Detect unsupported/binary files before loading them into the editor.
-6. Add encoding selection or at minimum UTF-8/UTF-8 BOM detection.
-7. Translate remaining command and search UI text into Chinese consistently.
-8. Add focused unit tests for search, session migration, and file-state transitions.
-
-Avoid adding cloud sync, user accounts, AI functions, a plugin marketplace, or other high-complexity features until the core APK workflow is stable.
-
-## 12. Continuation Checklist
-
-At the start of the next session:
+## 下一次会话检查
 
 ```sh
 cd /data/data/com.termux/files/home/test/nodeyyy
@@ -349,18 +259,16 @@ git log --oneline -5
 npm run build
 ```
 
-Before pushing:
+提交前：
 
 ```sh
 git diff --check
 npm run android:sync
 ```
 
-Push with the configured GitHub SSH key:
+推送：
 
 ```sh
 GIT_SSH_COMMAND='ssh -i /data/data/com.termux/files/home/.ssh/id_ed25519_github -o IdentitiesOnly=yes' \
 git push origin main
 ```
-
-After pushing, verify the latest GitHub Actions run and check that the `debug-latest` APK release was updated.

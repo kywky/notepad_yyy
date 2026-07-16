@@ -30,15 +30,6 @@ public class NotepadFilesPlugin extends Plugin {
             Intent.FLAG_GRANT_WRITE_URI_PERMISSION |
             Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
         );
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
-            "text/*",
-            "application/json",
-            "application/xml",
-            "application/javascript",
-            "application/x-sh",
-            "text/markdown"
-        });
-
         try {
             startActivityForResult(call, intent, "handleOpenTextFile");
         } catch (Exception error) {

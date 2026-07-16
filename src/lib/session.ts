@@ -1,12 +1,9 @@
-import { detectLanguage, type LanguageId } from "./languages";
-
 export type ThemeMode = "light" | "dark";
 
 export type EditorDocument = {
   id: string;
   name: string;
   content: string;
-  language: LanguageId;
   nativeUri?: string;
   dirty: boolean;
   createdAt: number;
@@ -17,9 +14,6 @@ export type EditorSettings = {
   theme: ThemeMode;
   lineWrapping: boolean;
   fontSize: number;
-  tabSize: number;
-  sidebarOpen: boolean;
-  searchOpen: boolean;
 };
 
 export type PersistedSession = {
@@ -33,11 +27,8 @@ const LEGACY_STORAGE_KEY = "notepad-plus-web-session-v1";
 
 export const defaultSettings: EditorSettings = {
   theme: "light",
-  lineWrapping: false,
-  fontSize: 14,
-  tabSize: 2,
-  sidebarOpen: true,
-  searchOpen: false
+  lineWrapping: true,
+  fontSize: 14
 };
 
 export function createId(): string {
@@ -52,7 +43,6 @@ export function createDocument(options: {
   name?: string;
   content?: string;
   dirty?: boolean;
-  language?: LanguageId;
   nativeUri?: string;
 }): EditorDocument {
   const name = options.name ?? "Untitled.txt";
@@ -62,7 +52,6 @@ export function createDocument(options: {
     id: createId(),
     name,
     content: options.content ?? "",
-    language: options.language ?? detectLanguage(name),
     nativeUri: options.nativeUri,
     dirty: options.dirty ?? false,
     createdAt: now,
