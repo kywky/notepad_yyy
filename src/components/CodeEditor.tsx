@@ -306,12 +306,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     redo: () => (viewRef.current ? redoCommand(viewRef.current) : false)
   }));
 
-  return (
-    <div
-      className={`editor-host ${props.lineWrapping ? "is-wrapping" : "is-no-wrap"}`}
-      ref={hostRef}
-    />
-  );
+  return <div className="editor-host" ref={hostRef} />;
 });
 
 CodeEditor.displayName = "CodeEditor";
