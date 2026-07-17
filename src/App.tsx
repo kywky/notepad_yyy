@@ -510,12 +510,19 @@ function App() {
           <IconButton icon={Undo2} label="撤销" onClick={() => editorRef.current?.undo()} />
           <IconButton icon={Redo2} label="重做" onClick={() => editorRef.current?.redo()} />
           <IconButton active={searchOpen} icon={Search} label="查找和替换" onClick={() => setSearchOpen(!searchOpen)} />
-          <IconButton
-            active={settings.lineWrapping}
-            icon={WrapText}
-            label="自动换行"
-            onClick={() => updateSettings({ lineWrapping: !settings.lineWrapping })}
-          />
+          <label
+            className={`wrap-toggle${settings.lineWrapping ? " is-active" : ""}`}
+            title={settings.lineWrapping ? "自动换行已开启" : "自动换行已关闭，可左右滚动"}
+          >
+            <WrapText size={17} strokeWidth={2} />
+            <span>换行</span>
+            <input
+              aria-label="自动换行"
+              checked={settings.lineWrapping}
+              onChange={(event) => updateSettings({ lineWrapping: event.target.checked })}
+              type="checkbox"
+            />
+          </label>
           <span className="toolbar-separator" />
           <IconButton
             disabled={settings.fontSize <= 11}
@@ -608,6 +615,7 @@ function App() {
 
       <footer className="statusbar">
         <span>Ln {cursor.line}, Col {cursor.column}</span>
+        <span>{settings.lineWrapping ? "自动换行" : "左右滚动"}</span>
         <span>{status.lines} 行</span>
         <span>{status.characters} 字符</span>
         <span>{status.eol}</span>

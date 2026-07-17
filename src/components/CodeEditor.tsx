@@ -96,6 +96,9 @@ function editorTheme(theme: ThemeMode, fontSize: number): Extension {
     {
       "&": {
         height: "100%",
+        minHeight: "0",
+        minWidth: "0",
+        width: "100%",
         color: dark ? "#dce5ef" : "#17202b",
         backgroundColor: dark ? "#121820" : "#ffffff",
         fontSize: `${fontSize}px`
@@ -103,7 +106,11 @@ function editorTheme(theme: ThemeMode, fontSize: number): Extension {
       ".cm-scroller": {
         fontFamily: '"JetBrains Mono", "Cascadia Code", Consolas, monospace',
         lineHeight: "1.55",
-        overflow: "auto"
+        minHeight: "0",
+        minWidth: "0",
+        overflowX: "auto",
+        overflowY: "auto",
+        touchAction: "pan-x pan-y"
       },
       ".cm-content": { minHeight: "100%", caretColor: dark ? "#f3f7fb" : "#111827" },
       ".cm-line": { padding: "0 8px" },
@@ -262,7 +269,12 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     redo: () => (viewRef.current ? redoCommand(viewRef.current) : false)
   }));
 
-  return <div className="editor-host" ref={hostRef} />;
+  return (
+    <div
+      className={`editor-host ${props.lineWrapping ? "is-wrapping" : "is-no-wrap"}`}
+      ref={hostRef}
+    />
+  );
 });
 
 CodeEditor.displayName = "CodeEditor";
