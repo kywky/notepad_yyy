@@ -7,6 +7,19 @@ export type NativeTextFile = {
   uri?: string;
 };
 
+export type NativeDirectoryFile = {
+  name: string;
+  path: string;
+  uri: string;
+};
+
+export type NativeDirectory = {
+  cancelled?: boolean;
+  name?: string;
+  files?: NativeDirectoryFile[];
+  truncated?: boolean;
+};
+
 type SaveTextFileOptions = {
   fileName: string;
   content: string;
@@ -23,8 +36,14 @@ type WriteTextFileOptions = {
   content: string;
 };
 
+type ReadTextFileOptions = {
+  uri: string;
+};
+
 type NotepadFilesPlugin = {
   openTextFile: () => Promise<NativeTextFile>;
+  openDirectory: () => Promise<NativeDirectory>;
+  readTextFile: (options: ReadTextFileOptions) => Promise<NativeTextFile>;
   saveTextFile: (options: SaveTextFileOptions) => Promise<SaveTextFileResult>;
   writeTextFile: (options: WriteTextFileOptions) => Promise<{ uri: string }>;
   addListener: (
@@ -54,6 +73,23 @@ export async function openNativeTextFile() {
     content: result.content,
     uri: result.uri
   };
+}
+
+export async function openNativeDirectory() {
+  if (!hasNativeFilePicker()) {
+    return null;
+  }
+
+  const result = await NotepadFiles.openDirectory();
+  return result.cancelled ? null : result;
+}
+
+export async function readNativeTextFile(uri: string) {
+  if (!hasNativeFilePicker()) {
+    return null;
+  }
+
+  return NotepadFiles.readTextFile({ uri });
 }
 
 export async function listenForNativeOpenFile(listener: (file: NativeTextFile) => void) {

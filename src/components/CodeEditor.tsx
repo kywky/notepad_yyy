@@ -34,6 +34,10 @@ import {
   type MutableRefObject
 } from "react";
 import type { ThemeMode } from "../lib/session";
+import {
+  loadLanguageExtension,
+  syntaxHighlightingExtension
+} from "../lib/languages";
 
 export type CursorInfo = {
   line: number;
@@ -55,6 +59,7 @@ export type CodeEditorHandle = {
 
 type CodeEditorProps = {
   content: string;
+  fileName: string;
   theme: ThemeMode;
   lineWrapping: boolean;
   fontSize: number;
@@ -141,6 +146,7 @@ function extensions(
   propsRef: MutableRefObject<CodeEditorProps>,
   theme: Compartment,
   wrapping: Compartment,
+  language: Compartment,
   applyingExternal: MutableRefObject<boolean>
 ): Extension[] {
   return [
@@ -151,6 +157,7 @@ function extensions(
     dropCursor(),
     highlightActiveLine(),
     searchHighlightField,
+    syntaxHighlightingExtension,
     keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
     EditorState.tabSize.of(2),
     EditorView.updateListener.of((update) => {
@@ -173,7 +180,8 @@ function extensions(
       }
     }),
     theme.of(editorTheme(propsRef.current.theme, propsRef.current.fontSize)),
-    wrapping.of(propsRef.current.lineWrapping ? EditorView.lineWrapping : [])
+    wrapping.of(propsRef.current.lineWrapping ? EditorView.lineWrapping : []),
+    language.of([])
   ];
 }
 
@@ -184,7 +192,11 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
   const applyingExternal = useRef(false);
   propsRef.current = props;
   const compartments = useMemo(
-    () => ({ theme: new Compartment(), wrapping: new Compartment() }),
+    () => ({
+      theme: new Compartment(),
+      wrapping: new Compartment(),
+      language: new Compartment()
+    }),
     []
   );
 
@@ -193,7 +205,13 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     viewRef.current = new EditorView({
       state: EditorState.create({
         doc: propsRef.current.content,
-        extensions: extensions(propsRef, compartments.theme, compartments.wrapping, applyingExternal)
+        extensions: extensions(
+          propsRef,
+          compartments.theme,
+          compartments.wrapping,
+          compartments.language,
+          applyingExternal
+        )
       }),
       parent: hostRef.current
     });
@@ -226,6 +244,25 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
       effects: compartments.wrapping.reconfigure(props.lineWrapping ? EditorView.lineWrapping : [])
     });
   }, [compartments.wrapping, props.lineWrapping]);
+
+  useEffect(() => {
+    let active = true;
+    const view = viewRef.current;
+    if (!view) return;
+
+    view.dispatch({ effects: compartments.language.reconfigure([]) });
+    void loadLanguageExtension(props.fileName)
+      .then((extension) => {
+        if (active && viewRef.current === view) {
+          view.dispatch({ effects: compartments.language.reconfigure(extension) });
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [compartments.language, props.fileName]);
 
   useEffect(() => {
     viewRef.current?.dispatch({

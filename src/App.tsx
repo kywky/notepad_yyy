@@ -1,11 +1,14 @@
 import {
   ChevronLeft,
   ChevronRight,
+  FileCode2,
   FilePlus2,
   FileText,
   FolderOpen,
+  FolderTree,
   Minus,
   Moon,
+  PanelLeft,
   Plus,
   Redo2,
   Save,
@@ -30,6 +33,7 @@ import CodeEditor, {
   type CodeEditorHandle,
   type CursorInfo
 } from "./components/CodeEditor";
+import { languageLabel } from "./lib/languages";
 import {
   createDocument,
   loadSession,
@@ -48,9 +52,12 @@ import { APP_NAME } from "./lib/platform";
 import {
   hasNativeFilePicker,
   listenForNativeOpenFile,
+  openNativeDirectory,
   openNativeTextFile,
+  readNativeTextFile,
   saveNativeTextFile,
   writeNativeTextFile,
+  type NativeDirectoryFile,
   type NativeTextFile
 } from "./lib/nativeFiles";
 
@@ -60,6 +67,14 @@ type IconButtonProps = {
   onClick: () => unknown;
   active?: boolean;
   disabled?: boolean;
+};
+
+type DirectoryEntry = {
+  key: string;
+  name: string;
+  path: string;
+  uri?: string;
+  file?: File;
 };
 
 const initialSession = loadSession();
@@ -185,9 +200,16 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [directoryName, setDirectoryName] = useState("目录");
+  const [directoryFiles, setDirectoryFiles] = useState<DirectoryEntry[]>([]);
+  const [directoryTruncated, setDirectoryTruncated] = useState(false);
+  const [openingPath, setOpeningPath] = useState("");
   const searchOpenRef = useRef(searchOpen);
+  const sidebarOpenRef = useRef(sidebarOpen);
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const directoryInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.id === activeId) ?? documents[0],
@@ -214,6 +236,11 @@ function App() {
     [activeDocument.content]
   );
 
+  const activeLanguage = useMemo(
+    () => languageLabel(activeDocument.name),
+    [activeDocument.name]
+  );
+
   useEffect(() => saveSession({ documents, activeId, settings }), [activeId, documents, settings]);
 
   useEffect(() => {
@@ -224,6 +251,14 @@ function App() {
   useEffect(() => {
     searchOpenRef.current = searchOpen;
   }, [searchOpen]);
+
+  useEffect(() => {
+    sidebarOpenRef.current = sidebarOpen;
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    directoryInputRef.current?.setAttribute("webkitdirectory", "");
+  }, []);
 
   useEffect(() => {
     setActiveSearchIndex(-1);
@@ -260,10 +295,10 @@ function App() {
     const handleBack = () => {
       if (searchOpenRef.current) {
         setSearchOpen(false);
-        history.pushState({ notepadBackGuard: true }, "");
-      } else {
-        history.back();
+      } else if (sidebarOpenRef.current) {
+        setSidebarOpen(false);
       }
+      history.pushState({ notepadBackGuard: true }, "");
     };
     window.addEventListener("popstate", handleBack);
     return () => window.removeEventListener("popstate", handleBack);
@@ -328,6 +363,64 @@ function App() {
     setActiveId(opened[0].id);
   }
 
+  function setDirectory(entries: DirectoryEntry[], name: string, truncated: boolean) {
+    setDirectoryName(name || "目录");
+    setDirectoryFiles(entries.sort((left, right) => left.path.localeCompare(right.path)));
+    setDirectoryTruncated(truncated);
+    setSidebarOpen(true);
+  }
+
+  async function openDirectory() {
+    if (!hasNativeFilePicker()) {
+      directoryInputRef.current?.click();
+      return;
+    }
+
+    try {
+      const directory = await openNativeDirectory();
+      if (!directory) return;
+      const entries = (directory.files ?? []).map((file: NativeDirectoryFile) => ({
+        key: `native:${file.uri}`,
+        name: file.name,
+        path: file.path,
+        uri: file.uri
+      }));
+      setDirectory(entries, directory.name ?? "目录", Boolean(directory.truncated));
+    } catch {
+      window.alert("无法读取该目录。");
+    }
+  }
+
+  async function openDirectoryEntry(entry: DirectoryEntry) {
+    const existing = documents.find((document) => document.sourcePath === entry.key);
+    if (existing) {
+      setActiveId(existing.id);
+      if (window.matchMedia("(max-width: 760px)").matches) setSidebarOpen(false);
+      return;
+    }
+
+    setOpeningPath(entry.key);
+    try {
+      const nativeFile = entry.uri ? await readNativeTextFile(entry.uri) : null;
+      const content = entry.file ? await entry.file.text() : nativeFile?.content;
+      if (content === undefined) throw new Error("File content is unavailable");
+      const document = createDocument({
+        name: entry.name,
+        content,
+        dirty: false,
+        nativeUri: entry.uri,
+        sourcePath: entry.key
+      });
+      setDocuments((current) => [...current, document]);
+      setActiveId(document.id);
+      if (window.matchMedia("(max-width: 760px)").matches) setSidebarOpen(false);
+    } catch {
+      window.alert("无法作为文本打开该文件。");
+    } finally {
+      setOpeningPath("");
+    }
+  }
+
   async function openFromDevice() {
     if (!hasNativeFilePicker()) {
       fileInputRef.current?.click();
@@ -343,11 +436,20 @@ function App() {
 
   function addNativeDocument(file: NativeTextFile) {
     if (!file.name || file.content === undefined) return;
+    const sourcePath = file.uri ? `native:${file.uri}` : undefined;
+    const existing = sourcePath
+      ? documents.find((document) => document.sourcePath === sourcePath)
+      : undefined;
+    if (existing) {
+      setActiveId(existing.id);
+      return;
+    }
     const document = createDocument({
       name: file.name,
       content: file.content,
       dirty: false,
-      nativeUri: file.uri
+      nativeUri: file.uri,
+      sourcePath
     });
     setDocuments((current) => [...current, document]);
     setActiveId(document.id);
@@ -472,6 +574,29 @@ function App() {
     event.currentTarget.value = "";
   }
 
+  function handleDirectoryInput(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.currentTarget.files ?? []);
+    if (files.length > 0) {
+      const visibleFiles = files.slice(0, 500);
+      const firstPath = visibleFiles[0].webkitRelativePath || visibleFiles[0].name;
+      const name = firstPath.split("/")[0] || "目录";
+      setDirectory(
+        visibleFiles.map((file) => {
+          const path = file.webkitRelativePath || file.name;
+          return {
+            key: `web:${path}:${file.lastModified}`,
+            name: file.name,
+            path: path.startsWith(`${name}/`) ? path.slice(name.length + 1) : path,
+            file
+          };
+        }),
+        name,
+        files.length > visibleFiles.length
+      );
+    }
+    event.currentTarget.value = "";
+  }
+
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     if (event.dataTransfer.files.length > 0) void openFiles(event.dataTransfer.files);
@@ -488,6 +613,13 @@ function App() {
       onDrop={handleDrop}
     >
       <input ref={fileInputRef} className="hidden-file-input" multiple onChange={handleFileInput} type="file" />
+      <input
+        ref={directoryInputRef}
+        className="hidden-file-input"
+        multiple
+        onChange={handleDirectoryInput}
+        type="file"
+      />
 
       <header className="topbar">
         <div className="title-row">
@@ -505,6 +637,13 @@ function App() {
         <div className="main-toolbar" aria-label="常用操作">
           <IconButton icon={FilePlus2} label="新建文本" onClick={newDocument} />
           <IconButton icon={FolderOpen} label="打开任意文本文件" onClick={openFromDevice} />
+          <IconButton icon={FolderTree} label="打开目录" onClick={openDirectory} />
+          <IconButton
+            active={sidebarOpen}
+            icon={PanelLeft}
+            label={sidebarOpen ? "隐藏侧边栏" : "显示侧边栏"}
+            onClick={() => setSidebarOpen((current) => !current)}
+          />
           <IconButton icon={Save} label="保存文件" onClick={saveActiveDocument} />
           <span className="toolbar-separator" />
           <IconButton icon={Undo2} label="撤销" onClick={() => editorRef.current?.undo()} />
@@ -576,45 +715,89 @@ function App() {
         </section>
       ) : null}
 
-      <div className="tab-strip" role="tablist" aria-label="打开的文件">
-        {documents.map((document) => (
-          <button
-            className={`tab${document.id === activeId ? " is-active" : ""}`}
-            key={document.id}
-            onClick={() => setActiveId(document.id)}
-            onDoubleClick={() => renameDocument(document.id)}
-            role="tab"
-            type="button"
-          >
-            <span>{document.dirty ? `* ${document.name}` : document.name}</span>
-            <span
-              className="tab-close"
-              onClick={(event) => { event.stopPropagation(); closeDocument(document.id); }}
-              role="button"
-              title="关闭"
-            >
-              <X size={13} />
-            </span>
-          </button>
-        ))}
-      </div>
+      <div className="workspace">
+        {sidebarOpen ? (
+          <>
+            <button
+              aria-label="关闭侧边栏"
+              className="sidebar-scrim"
+              onClick={() => setSidebarOpen(false)}
+              type="button"
+            />
+            <aside className="sidebar" aria-label="目录文件">
+              <div className="sidebar-header">
+                <span title={directoryName}>{directoryName}</span>
+                <IconButton icon={FolderTree} label="选择目录" onClick={openDirectory} />
+                <IconButton icon={X} label="隐藏侧边栏" onClick={() => setSidebarOpen(false)} />
+              </div>
+              <div className="sidebar-files">
+                {directoryFiles.length === 0 ? (
+                  <button className="choose-directory" onClick={openDirectory} type="button">
+                    <FolderTree size={17} />选择目录
+                  </button>
+                ) : directoryFiles.map((file) => (
+                  <button
+                    className="directory-file"
+                    disabled={openingPath === file.key}
+                    key={file.key}
+                    onClick={() => void openDirectoryEntry(file)}
+                    title={file.path}
+                    type="button"
+                  >
+                    <FileCode2 size={15} />
+                    <span>{file.path}</span>
+                  </button>
+                ))}
+              </div>
+              {directoryTruncated ? <div className="sidebar-note">仅显示前 500 个文件</div> : null}
+            </aside>
+          </>
+        ) : null}
 
-      <main className="editor-pane">
-        <CodeEditor
-          ref={editorRef}
-          activeSearchIndex={activeSearchIndex}
-          content={activeDocument.content}
-          fontSize={settings.fontSize}
-          lineWrapping={settings.lineWrapping}
-          onChange={(content) => updateDocument(activeDocument.id, { content, dirty: true })}
-          onCursorChange={setCursor}
-          searchMatches={searchResult.matches}
-          theme={settings.theme}
-        />
-      </main>
+        <section className="editor-workspace">
+          <div className="tab-strip" role="tablist" aria-label="打开的文件">
+            {documents.map((document) => (
+              <button
+                className={`tab${document.id === activeId ? " is-active" : ""}`}
+                key={document.id}
+                onClick={() => setActiveId(document.id)}
+                onDoubleClick={() => renameDocument(document.id)}
+                role="tab"
+                type="button"
+              >
+                <span>{document.dirty ? `* ${document.name}` : document.name}</span>
+                <span
+                  className="tab-close"
+                  onClick={(event) => { event.stopPropagation(); closeDocument(document.id); }}
+                  role="button"
+                  title="关闭"
+                >
+                  <X size={13} />
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <main className="editor-pane">
+            <CodeEditor
+              ref={editorRef}
+              activeSearchIndex={activeSearchIndex}
+              content={activeDocument.content}
+              fileName={activeDocument.name}
+              fontSize={settings.fontSize}
+              lineWrapping={settings.lineWrapping}
+              onChange={(content) => updateDocument(activeDocument.id, { content, dirty: true })}
+              onCursorChange={setCursor}
+              searchMatches={searchResult.matches}
+              theme={settings.theme}
+            />
+          </main>
+        </section>
+      </div>
 
       <footer className="statusbar">
         <span>Ln {cursor.line}, Col {cursor.column}</span>
+        <span>{activeLanguage}</span>
         <span>{settings.lineWrapping ? "自动换行" : "左右滚动"}</span>
         <span>{status.lines} 行</span>
         <span>{status.characters} 字符</span>

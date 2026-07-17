@@ -46,7 +46,7 @@ button { color: inherit; }
   position: fixed;
   inset: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) 24px;
+  grid-template-rows: auto minmax(0, 1fr) 24px;
   width: 100%;
   height: 100%;
   height: 100vh;
@@ -58,7 +58,7 @@ button { color: inherit; }
 }
 
 .app-shell.search-open {
-  grid-template-rows: auto auto auto minmax(0, 1fr) 24px;
+  grid-template-rows: auto auto minmax(0, 1fr) 24px;
 }
 
 .topbar {
@@ -279,6 +279,96 @@ button { color: inherit; }
 }
 .tab-close:hover { background: var(--surface-3); }
 
+.workspace {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar {
+  position: relative;
+  z-index: 12;
+  display: grid;
+  grid-template-rows: 36px minmax(0, 1fr) auto;
+  width: 218px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.sidebar-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 3px 2px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-header > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-header .icon-button { width: 28px; height: 28px; }
+
+.sidebar-files {
+  min-height: 0;
+  overflow: auto;
+  padding: 3px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.directory-file, .choose-directory {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.directory-file svg, .choose-directory svg { flex: 0 0 auto; }
+.directory-file span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.directory-file:hover, .directory-file:active, .choose-directory:hover, .choose-directory:active {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.directory-file:disabled { opacity: 0.55; }
+.sidebar-note {
+  padding: 5px 8px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+}
+.sidebar-scrim { display: none; }
+
 .editor-pane {
   position: relative;
   min-width: 0;
@@ -355,16 +445,35 @@ button { color: inherit; }
   .search-actions button:not(.icon-button) { min-height: 34px; }
   .tab { min-width: 122px; max-width: 170px; height: 34px; }
   .editor-host .cm-scroller { font-size: max(14px, 1rem); }
-  .statusbar span:nth-child(3), .statusbar span:nth-child(4), .statusbar span:nth-child(5), .statusbar span:nth-child(6) { display: none; }
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(76vw, 280px);
+    box-shadow: var(--shadow);
+  }
+  .sidebar-scrim {
+    position: absolute;
+    z-index: 11;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: rgba(0, 0, 0, 0.22);
+  }
+  .directory-file, .choose-directory { height: 34px; }
+  .statusbar span:nth-child(4), .statusbar span:nth-child(5), .statusbar span:nth-child(6), .statusbar span:nth-child(7) { display: none; }
 }
 
 @media (max-width: 460px) {
   .search-inputs { grid-template-columns: minmax(0, 1fr); }
   .search-actions { padding-bottom: 1px; }
   .active-file { font-size: 11px; }
-  .statusbar span:nth-child(3) { display: none; }
+  .statusbar span:nth-child(4) { display: none; }
 }
 
 .app-shell.keyboard-open .statusbar { display: none; }
-.app-shell.keyboard-open { grid-template-rows: auto auto minmax(0, 1fr); }
-.app-shell.search-open.keyboard-open { grid-template-rows: auto auto auto minmax(0, 1fr); }
+.app-shell.keyboard-open { grid-template-rows: auto minmax(0, 1fr); }
+.app-shell.search-open.keyboard-open { grid-template-rows: auto auto minmax(0, 1fr); }

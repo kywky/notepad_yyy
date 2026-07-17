@@ -5,6 +5,7 @@ export type EditorDocument = {
   name: string;
   content: string;
   nativeUri?: string;
+  sourcePath?: string;
   dirty: boolean;
   createdAt: number;
   updatedAt: number;
@@ -44,6 +45,7 @@ export function createDocument(options: {
   content?: string;
   dirty?: boolean;
   nativeUri?: string;
+  sourcePath?: string;
 }): EditorDocument {
   const name = options.name ?? "Untitled.txt";
   const now = Date.now();
@@ -53,6 +55,7 @@ export function createDocument(options: {
     name,
     content: options.content ?? "",
     nativeUri: options.nativeUri,
+    sourcePath: options.sourcePath,
     dirty: options.dirty ?? false,
     createdAt: now,
     updatedAt: now

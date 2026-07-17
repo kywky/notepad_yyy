@@ -6,6 +6,8 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
 import androidx.activity.result.ActivityResult;
+import androidx.documentfile.provider.DocumentFile;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -19,6 +21,8 @@ import java.nio.charset.StandardCharsets;
 
 @CapacitorPlugin(name = "NotepadFiles")
 public class NotepadFilesPlugin extends Plugin {
+
+    private static final int MAX_DIRECTORY_FILES = 500;
 
     @PluginMethod
     public void openTextFile(PluginCall call) {
@@ -58,6 +62,72 @@ public class NotepadFilesPlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception error) {
             call.reject("Could not read selected file.", error);
+        }
+    }
+
+    @PluginMethod
+    public void openDirectory(PluginCall call) {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(
+            Intent.FLAG_GRANT_READ_URI_PERMISSION |
+            Intent.FLAG_GRANT_WRITE_URI_PERMISSION |
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION |
+            Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+        );
+        try {
+            startActivityForResult(call, intent, "handleOpenDirectory");
+        } catch (Exception error) {
+            call.reject("Could not open directory picker.", error);
+        }
+    }
+
+    @ActivityCallback
+    private void handleOpenDirectory(PluginCall call, ActivityResult result) {
+        if (call == null) {
+            return;
+        }
+
+        if (result.getResultCode() != Activity.RESULT_OK || result.getData() == null || result.getData().getData() == null) {
+            JSObject ret = new JSObject();
+            ret.put("cancelled", true);
+            call.resolve(ret);
+            return;
+        }
+
+        Uri uri = result.getData().getData();
+        persistUriPermission(result.getData(), uri);
+        DocumentFile root = DocumentFile.fromTreeUri(getContext(), uri);
+        if (root == null || !root.isDirectory()) {
+            call.reject("Could not read selected directory.");
+            return;
+        }
+
+        try {
+            JSArray files = new JSArray();
+            int[] count = new int[] { 0 };
+            collectDirectoryFiles(root, "", files, count);
+            JSObject ret = new JSObject();
+            ret.put("name", root.getName() == null ? "目录" : root.getName());
+            ret.put("files", files);
+            ret.put("truncated", count[0] >= MAX_DIRECTORY_FILES);
+            call.resolve(ret);
+        } catch (Exception error) {
+            call.reject("Could not list selected directory.", error);
+        }
+    }
+
+    @PluginMethod
+    public void readTextFile(PluginCall call) {
+        String uriString = call.getString("uri");
+        if (uriString == null || uriString.trim().isEmpty()) {
+            call.reject("File URI is required.");
+            return;
+        }
+
+        try {
+            call.resolve(readUri(Uri.parse(uriString)));
+        } catch (Exception error) {
+            call.reject("Could not read file.", error);
         }
     }
 
@@ -151,6 +221,31 @@ public class NotepadFilesPlugin extends Plugin {
         }
 
         return buffer.toString(StandardCharsets.UTF_8.name());
+    }
+
+    private void collectDirectoryFiles(DocumentFile directory, String parentPath, JSArray files, int[] count) {
+        if (count[0] >= MAX_DIRECTORY_FILES) {
+            return;
+        }
+
+        for (DocumentFile child : directory.listFiles()) {
+            if (count[0] >= MAX_DIRECTORY_FILES) {
+                return;
+            }
+
+            String name = child.getName() == null ? "未命名" : child.getName();
+            String path = parentPath.isEmpty() ? name : parentPath + "/" + name;
+            if (child.isDirectory()) {
+                collectDirectoryFiles(child, path, files, count);
+            } else if (child.isFile()) {
+                JSObject file = new JSObject();
+                file.put("name", name);
+                file.put("path", path);
+                file.put("uri", child.getUri().toString());
+                files.put(file);
+                count[0] += 1;
+            }
+        }
     }
 
     @Override
