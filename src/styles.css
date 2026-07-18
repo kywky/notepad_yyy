@@ -404,6 +404,20 @@ button { color: inherit; }
   scrollbar-width: thin;
   scrollbar-color: var(--muted) transparent;
 }
+.editor-host.is-wrapping .cm-content {
+  width: 0;
+  min-width: 0;
+  flex: 1 1 0;
+  white-space: break-spaces !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+.editor-host.is-wrapping .cm-line {
+  max-width: 100%;
+  white-space: inherit;
+  overflow-wrap: inherit;
+  word-break: inherit;
+}
 .editor-host .cm-scroller::-webkit-scrollbar { width: 8px; height: 8px; }
 .editor-host .cm-scroller::-webkit-scrollbar-thumb {
   border: 2px solid transparent;

@@ -240,9 +240,14 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
   }, [compartments.theme, props.fontSize, props.theme]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
       effects: compartments.wrapping.reconfigure(props.lineWrapping ? EditorView.lineWrapping : [])
     });
+    view.requestMeasure();
+    const frame = window.requestAnimationFrame(() => view.requestMeasure());
+    return () => window.cancelAnimationFrame(frame);
   }, [compartments.wrapping, props.lineWrapping]);
 
   useEffect(() => {
@@ -306,7 +311,12 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     redo: () => (viewRef.current ? redoCommand(viewRef.current) : false)
   }));
 
-  return <div className="editor-host" ref={hostRef} />;
+  return (
+    <div
+      className={`editor-host ${props.lineWrapping ? "is-wrapping" : "is-no-wrap"}`}
+      ref={hostRef}
+    />
+  );
 });
 
 CodeEditor.displayName = "CodeEditor";
