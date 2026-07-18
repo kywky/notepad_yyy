@@ -44,6 +44,7 @@ type NotepadFilesPlugin = {
   openTextFile: () => Promise<NativeTextFile>;
   openDirectory: () => Promise<NativeDirectory>;
   readTextFile: (options: ReadTextFileOptions) => Promise<NativeTextFile>;
+  exitApp: () => Promise<void>;
   saveTextFile: (options: SaveTextFileOptions) => Promise<SaveTextFileResult>;
   writeTextFile: (options: WriteTextFileOptions) => Promise<{ uri: string }>;
   addListener: (
@@ -90,6 +91,12 @@ export async function readNativeTextFile(uri: string) {
   }
 
   return NotepadFiles.readTextFile({ uri });
+}
+
+export async function exitNativeApp() {
+  if (hasNativeFilePicker()) {
+    await NotepadFiles.exitApp();
+  }
 }
 
 export async function listenForNativeOpenFile(listener: (file: NativeTextFile) => void) {

@@ -405,12 +405,11 @@ button { color: inherit; }
   scrollbar-color: var(--muted) transparent;
 }
 .editor-host.is-wrapping .cm-content {
-  width: 0;
   min-width: 0;
   flex: 1 1 0;
-  white-space: break-spaces !important;
+  white-space: pre-wrap !important;
   overflow-wrap: anywhere !important;
-  word-break: break-word !important;
+  word-break: break-all !important;
 }
 .editor-host.is-wrapping .cm-line {
   max-width: 100%;

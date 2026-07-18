@@ -25,6 +25,14 @@ public class NotepadFilesPlugin extends Plugin {
     private static final int MAX_DIRECTORY_FILES = 500;
 
     @PluginMethod
+    public void exitApp(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            getActivity().finish();
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
     public void openTextFile(PluginCall call) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);

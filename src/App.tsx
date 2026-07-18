@@ -55,6 +55,7 @@ import {
   openNativeDirectory,
   openNativeTextFile,
   readNativeTextFile,
+  exitNativeApp,
   saveNativeTextFile,
   writeNativeTextFile,
   type NativeDirectoryFile,
@@ -205,8 +206,6 @@ function App() {
   const [directoryFiles, setDirectoryFiles] = useState<DirectoryEntry[]>([]);
   const [directoryTruncated, setDirectoryTruncated] = useState(false);
   const [openingPath, setOpeningPath] = useState("");
-  const searchOpenRef = useRef(searchOpen);
-  const sidebarOpenRef = useRef(sidebarOpen);
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const directoryInputRef = useRef<HTMLInputElement | null>(null);
@@ -249,14 +248,6 @@ function App() {
   }, [activeDocument.dirty, activeDocument.name, settings.theme]);
 
   useEffect(() => {
-    searchOpenRef.current = searchOpen;
-  }, [searchOpen]);
-
-  useEffect(() => {
-    sidebarOpenRef.current = sidebarOpen;
-  }, [sidebarOpen]);
-
-  useEffect(() => {
     directoryInputRef.current?.setAttribute("webkitdirectory", "");
   }, []);
 
@@ -290,19 +281,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    history.replaceState({ ...history.state, notepadRoot: true }, "");
-    history.pushState({ notepadBackGuard: true }, "");
-    const handleBack = () => {
-      if (searchOpenRef.current) {
+    const handleNativeBack = () => {
+      if (searchOpen) {
         setSearchOpen(false);
-      } else if (sidebarOpenRef.current) {
+      } else if (sidebarOpen) {
         setSidebarOpen(false);
+      } else {
+        void exitNativeApp();
       }
-      history.pushState({ notepadBackGuard: true }, "");
     };
-    window.addEventListener("popstate", handleBack);
-    return () => window.removeEventListener("popstate", handleBack);
-  }, []);
+    window.addEventListener("notepadNativeBack", handleNativeBack);
+    return () => window.removeEventListener("notepadNativeBack", handleNativeBack);
+  }, [searchOpen, sidebarOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
