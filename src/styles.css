@@ -406,12 +406,12 @@ button { color: inherit; }
 }
 .editor-host.is-wrapping .cm-content {
   min-width: 0;
-  flex: 1 1 0;
   white-space: pre-wrap !important;
   overflow-wrap: anywhere !important;
   word-break: break-all !important;
 }
 .editor-host.is-wrapping .cm-line {
+  width: 100%;
   max-width: 100%;
   white-space: inherit;
   overflow-wrap: inherit;

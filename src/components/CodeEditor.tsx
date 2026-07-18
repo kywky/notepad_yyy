@@ -70,6 +70,28 @@ type CodeEditorProps = {
 };
 
 type SearchHighlight = TextMatch & { active: boolean };
+
+function syncWrappedContentWidth(view: EditorView, lineWrapping: boolean) {
+  const content = view.contentDOM;
+  if (!lineWrapping) {
+    content.style.removeProperty("width");
+    content.style.removeProperty("max-width");
+    content.style.removeProperty("flex");
+    return;
+  }
+
+  const gutters = view.scrollDOM.querySelector<HTMLElement>(".cm-gutters");
+  const gutterWidth = gutters?.getBoundingClientRect().width ?? 0;
+  const availableWidth = Math.max(1, Math.floor(view.scrollDOM.clientWidth - gutterWidth));
+  const width = `${availableWidth}px`;
+  if (content.style.width === width) return;
+
+  content.style.width = width;
+  content.style.maxWidth = width;
+  content.style.flex = `0 0 ${width}`;
+  view.requestMeasure();
+}
+
 const setSearchHighlights = StateEffect.define<SearchHighlight[]>();
 const searchHighlightField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
@@ -215,8 +237,17 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
       }),
       parent: hostRef.current
     });
+    const view = viewRef.current;
+    const resizeObserver = new ResizeObserver(() => {
+      syncWrappedContentWidth(view, propsRef.current.lineWrapping);
+    });
+    resizeObserver.observe(view.scrollDOM);
+    const gutters = view.scrollDOM.querySelector<HTMLElement>(".cm-gutters");
+    if (gutters) resizeObserver.observe(gutters);
+    syncWrappedContentWidth(view, propsRef.current.lineWrapping);
     propsRef.current.onCursorChange({ line: 1, column: 1, offset: 0, selectionLength: 0 });
     return () => {
+      resizeObserver.disconnect();
       viewRef.current?.destroy();
       viewRef.current = null;
     };
@@ -245,8 +276,10 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     view.dispatch({
       effects: compartments.wrapping.reconfigure(props.lineWrapping ? EditorView.lineWrapping : [])
     });
-    view.requestMeasure();
-    const frame = window.requestAnimationFrame(() => view.requestMeasure());
+    syncWrappedContentWidth(view, props.lineWrapping);
+    const frame = window.requestAnimationFrame(() => {
+      syncWrappedContentWidth(view, props.lineWrapping);
+    });
     return () => window.cancelAnimationFrame(frame);
   }, [compartments.wrapping, props.lineWrapping]);
 
