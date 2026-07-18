@@ -410,6 +410,7 @@ button { color: inherit; }
   overflow-wrap: anywhere !important;
   word-break: break-all !important;
 }
+.editor-host.is-wrapping .cm-scroller { overflow-x: hidden !important; }
 .editor-host.is-wrapping .cm-line {
   width: 100%;
   max-width: 100%;

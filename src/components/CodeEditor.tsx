@@ -80,9 +80,15 @@ function syncWrappedContentWidth(view: EditorView, lineWrapping: boolean) {
     return;
   }
 
-  const gutters = view.scrollDOM.querySelector<HTMLElement>(".cm-gutters");
-  const gutterWidth = gutters?.getBoundingClientRect().width ?? 0;
-  const availableWidth = Math.max(1, Math.floor(view.scrollDOM.clientWidth - gutterWidth));
+  view.scrollDOM.scrollLeft = 0;
+  const contentLeft = content.getBoundingClientRect().left;
+  const scrollerRight = view.scrollDOM.getBoundingClientRect().right;
+  const viewport = window.visualViewport;
+  const viewportRight = viewport
+    ? viewport.offsetLeft + viewport.width
+    : window.innerWidth;
+  const visibleRight = Math.min(scrollerRight, viewportRight, window.innerWidth);
+  const availableWidth = Math.max(1, Math.floor(visibleRight - contentLeft - 8));
   const width = `${availableWidth}px`;
   if (content.style.width === width) return;
 
@@ -244,10 +250,18 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     resizeObserver.observe(view.scrollDOM);
     const gutters = view.scrollDOM.querySelector<HTMLElement>(".cm-gutters");
     if (gutters) resizeObserver.observe(gutters);
+    const viewport = window.visualViewport;
+    const handleViewportChange = () => {
+      syncWrappedContentWidth(view, propsRef.current.lineWrapping);
+    };
+    viewport?.addEventListener("resize", handleViewportChange);
+    viewport?.addEventListener("scroll", handleViewportChange);
     syncWrappedContentWidth(view, propsRef.current.lineWrapping);
     propsRef.current.onCursorChange({ line: 1, column: 1, offset: 0, selectionLength: 0 });
     return () => {
       resizeObserver.disconnect();
+      viewport?.removeEventListener("resize", handleViewportChange);
+      viewport?.removeEventListener("scroll", handleViewportChange);
       viewRef.current?.destroy();
       viewRef.current = null;
     };
