@@ -67,6 +67,7 @@ type CodeEditorProps = {
   activeSearchIndex: number;
   onChange: (content: string) => void;
   onCursorChange: (cursor: CursorInfo) => void;
+  onFontSizeChange: (fontSize: number) => void;
 };
 
 type SearchHighlight = TextMatch & { active: boolean };
@@ -256,12 +257,50 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     };
     viewport?.addEventListener("resize", handleViewportChange);
     viewport?.addEventListener("scroll", handleViewportChange);
+
+    let pinchStartDistance = 0;
+    let pinchStartFontSize = propsRef.current.fontSize;
+    let lastPinchFontSize = pinchStartFontSize;
+    const touchDistance = (event: TouchEvent) => {
+      const first = event.touches[0];
+      const second = event.touches[1];
+      return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+    };
+    const handleTouchStart = (event: TouchEvent) => {
+      if (event.touches.length !== 2) return;
+      event.preventDefault();
+      pinchStartDistance = touchDistance(event);
+      pinchStartFontSize = propsRef.current.fontSize;
+      lastPinchFontSize = pinchStartFontSize;
+    };
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length !== 2 || pinchStartDistance <= 0) return;
+      event.preventDefault();
+      const scale = touchDistance(event) / pinchStartDistance;
+      const nextFontSize = Math.max(11, Math.min(32, Math.round(pinchStartFontSize * scale)));
+      if (nextFontSize !== lastPinchFontSize) {
+        lastPinchFontSize = nextFontSize;
+        propsRef.current.onFontSizeChange(nextFontSize);
+      }
+    };
+    const handleTouchEnd = (event: TouchEvent) => {
+      if (event.touches.length < 2) pinchStartDistance = 0;
+    };
+    view.scrollDOM.addEventListener("touchstart", handleTouchStart, { passive: false });
+    view.scrollDOM.addEventListener("touchmove", handleTouchMove, { passive: false });
+    view.scrollDOM.addEventListener("touchend", handleTouchEnd);
+    view.scrollDOM.addEventListener("touchcancel", handleTouchEnd);
+
     syncWrappedContentWidth(view, propsRef.current.lineWrapping);
     propsRef.current.onCursorChange({ line: 1, column: 1, offset: 0, selectionLength: 0 });
     return () => {
       resizeObserver.disconnect();
       viewport?.removeEventListener("resize", handleViewportChange);
       viewport?.removeEventListener("scroll", handleViewportChange);
+      view.scrollDOM.removeEventListener("touchstart", handleTouchStart);
+      view.scrollDOM.removeEventListener("touchmove", handleTouchMove);
+      view.scrollDOM.removeEventListener("touchend", handleTouchEnd);
+      view.scrollDOM.removeEventListener("touchcancel", handleTouchEnd);
       viewRef.current?.destroy();
       viewRef.current = null;
     };
@@ -279,10 +318,19 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
   }, [props.content]);
 
   useEffect(() => {
-    viewRef.current?.dispatch({
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
       effects: compartments.theme.reconfigure(editorTheme(props.theme, props.fontSize))
     });
-  }, [compartments.theme, props.fontSize, props.theme]);
+    syncWrappedContentWidth(view, props.lineWrapping);
+    view.requestMeasure();
+    const frame = window.requestAnimationFrame(() => {
+      syncWrappedContentWidth(view, props.lineWrapping);
+      view.requestMeasure();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [compartments.theme, props.fontSize, props.lineWrapping, props.theme]);
 
   useEffect(() => {
     const view = viewRef.current;

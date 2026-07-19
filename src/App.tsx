@@ -661,10 +661,10 @@ function App() {
           />
           <span className="font-size-label">{settings.fontSize}</span>
           <IconButton
-            disabled={settings.fontSize >= 24}
+            disabled={settings.fontSize >= 32}
             icon={Plus}
             label="增大字体"
-            onClick={() => updateSettings({ fontSize: Math.min(24, settings.fontSize + 1) })}
+            onClick={() => updateSettings({ fontSize: Math.min(32, settings.fontSize + 1) })}
           />
         </div>
       </header>
@@ -778,6 +778,7 @@ function App() {
               lineWrapping={settings.lineWrapping}
               onChange={(content) => updateDocument(activeDocument.id, { content, dirty: true })}
               onCursorChange={setCursor}
+              onFontSizeChange={(fontSize) => updateSettings({ fontSize })}
               searchMatches={searchResult.matches}
               theme={settings.theme}
             />
