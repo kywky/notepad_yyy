@@ -4,6 +4,8 @@ import {
   FileCode2,
   FilePlus2,
   FileText,
+  History,
+  Home,
   FolderOpen,
   FolderTree,
   Minus,
@@ -193,6 +195,7 @@ function detectEol(content: string) {
 }
 
 function App() {
+  const [screen, setScreen] = useState<"home" | "editor">("home");
   const [documents, setDocuments] = useState<EditorDocument[]>(initialSession.documents);
   const [activeId, setActiveId] = useState(initialSession.activeId);
   const [settings, setSettings] = useState<EditorSettings>(initialSession.settings);
@@ -213,6 +216,11 @@ function App() {
   const activeDocument = useMemo(
     () => documents.find((document) => document.id === activeId) ?? documents[0],
     [activeId, documents]
+  );
+
+  const recentDocuments = useMemo(
+    () => [...documents].sort((left, right) => right.updatedAt - left.updatedAt).slice(0, 5),
+    [documents]
   );
 
   const searchResult = useMemo(() => {
@@ -244,8 +252,10 @@ function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
-    document.title = `${activeDocument.dirty ? "* " : ""}${activeDocument.name} - ${APP_NAME}`;
-  }, [activeDocument.dirty, activeDocument.name, settings.theme]);
+    document.title = screen === "home"
+      ? APP_NAME
+      : `${activeDocument.dirty ? "* " : ""}${activeDocument.name} - ${APP_NAME}`;
+  }, [activeDocument.dirty, activeDocument.name, screen, settings.theme]);
 
   useEffect(() => {
     directoryInputRef.current?.setAttribute("webkitdirectory", "");
@@ -286,13 +296,15 @@ function App() {
         setSearchOpen(false);
       } else if (sidebarOpen) {
         setSidebarOpen(false);
+      } else if (screen === "editor") {
+        setScreen("home");
       } else {
         void exitNativeApp();
       }
     };
     window.addEventListener("notepadNativeBack", handleNativeBack);
     return () => window.removeEventListener("notepadNativeBack", handleNativeBack);
-  }, [searchOpen, sidebarOpen]);
+  }, [screen, searchOpen, sidebarOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -343,6 +355,7 @@ function App() {
     const document = createDocument({ name: `新建文本-${count}.txt` });
     setDocuments((current) => [...current, document]);
     setActiveId(document.id);
+    setScreen("editor");
     setTimeout(() => editorRef.current?.focus(), 0);
   }
 
@@ -351,6 +364,7 @@ function App() {
     if (opened.length === 0) return;
     setDocuments((current) => [...current, ...opened]);
     setActiveId(opened[0].id);
+    setScreen("editor");
   }
 
   function setDirectory(entries: DirectoryEntry[], name: string, truncated: boolean) {
@@ -358,6 +372,7 @@ function App() {
     setDirectoryFiles(entries.sort((left, right) => left.path.localeCompare(right.path)));
     setDirectoryTruncated(truncated);
     setSidebarOpen(true);
+    setScreen("editor");
   }
 
   async function openDirectory() {
@@ -385,6 +400,7 @@ function App() {
     const existing = documents.find((document) => document.sourcePath === entry.key);
     if (existing) {
       setActiveId(existing.id);
+      setScreen("editor");
       if (window.matchMedia("(max-width: 760px)").matches) setSidebarOpen(false);
       return;
     }
@@ -403,6 +419,7 @@ function App() {
       });
       setDocuments((current) => [...current, document]);
       setActiveId(document.id);
+      setScreen("editor");
       if (window.matchMedia("(max-width: 760px)").matches) setSidebarOpen(false);
     } catch {
       window.alert("无法作为文本打开该文件。");
@@ -432,6 +449,7 @@ function App() {
       : undefined;
     if (existing) {
       setActiveId(existing.id);
+      setScreen("editor");
       return;
     }
     const document = createDocument({
@@ -443,6 +461,13 @@ function App() {
     });
     setDocuments((current) => [...current, document]);
     setActiveId(document.id);
+    setScreen("editor");
+  }
+
+  function openRecent(document: EditorDocument) {
+    setActiveId(document.id);
+    setScreen("editor");
+    setTimeout(() => editorRef.current?.focus(), 0);
   }
 
   async function saveAs(fileName: string, content: string) {
@@ -596,6 +621,64 @@ function App() {
     ? searchResult.error
     : `${searchResult.matches.length} 个匹配`;
 
+  if (screen === "home") {
+    return (
+      <div className="home-screen">
+        <input ref={fileInputRef} className="hidden-file-input" multiple onChange={handleFileInput} type="file" />
+        <input ref={directoryInputRef} className="hidden-file-input" multiple onChange={handleDirectoryInput} type="file" />
+        <button
+          aria-label="切换明暗主题"
+          className="home-theme-button"
+          onClick={() => updateSettings({ theme: settings.theme === "dark" ? "light" : "dark" })}
+          type="button"
+        >
+          {settings.theme === "dark" ? <Moon size={19} /> : <Sun size={19} />}
+        </button>
+        <main className="home-content">
+          <section className="home-hero">
+            <img alt="" className="home-logo" src="/icons/icon.svg" />
+            <div>
+              <p className="home-eyebrow">轻量文本编辑器</p>
+              <h1>{APP_NAME}</h1>
+              <p className="home-subtitle">简单、快速，随时开始编辑。</p>
+            </div>
+          </section>
+
+          <section className="home-actions" aria-label="开始">
+            <button className="home-action is-primary" onClick={newDocument} type="button">
+              <span className="home-action-icon"><FilePlus2 size={23} /></span>
+              <span><strong>新建</strong><small>创建一个空白文本</small></span>
+              <ChevronRight size={19} />
+            </button>
+            <button className="home-action" onClick={() => void openFromDevice()} type="button">
+              <span className="home-action-icon"><FolderOpen size={23} /></span>
+              <span><strong>打开</strong><small>从设备选择文本文件</small></span>
+              <ChevronRight size={19} />
+            </button>
+            <button className="home-action" onClick={() => void openDirectory()} type="button">
+              <span className="home-action-icon"><FolderTree size={23} /></span>
+              <span><strong>打开文件夹</strong><small>浏览文件夹中的文本</small></span>
+              <ChevronRight size={19} />
+            </button>
+          </section>
+
+          <section className="recent-section">
+            <div className="recent-heading"><span><History size={17} />打开最近</span><small>{recentDocuments.length} 个项目</small></div>
+            <div className="recent-list">
+              {recentDocuments.map((document) => (
+                <button key={document.id} onClick={() => openRecent(document)} type="button">
+                  <FileText size={18} />
+                  <span><strong>{document.name}</strong><small>{document.dirty ? "有未保存的修改" : "最近编辑"}</small></span>
+                  <ChevronRight size={18} />
+                </button>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`app-shell${searchOpen ? " search-open" : ""}${keyboardOpen ? " keyboard-open" : ""}`}
@@ -613,7 +696,7 @@ function App() {
 
       <header className="topbar">
         <div className="title-row">
-          <div className="brand"><FileText size={18} /><span>{APP_NAME}</span></div>
+          <button className="brand brand-button" onClick={() => setScreen("home")} type="button"><Home size={17} /><span>{APP_NAME}</span></button>
           <div className="active-file" title={activeDocument.name}>
             {activeDocument.dirty ? "* " : ""}{activeDocument.name}
           </div>
