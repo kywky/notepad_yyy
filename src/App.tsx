@@ -16,6 +16,7 @@ import {
   Save,
   Search,
   Sun,
+  Trash2,
   Undo2,
   WrapText,
   X
@@ -38,6 +39,7 @@ import CodeEditor, {
 import { languageLabel } from "./lib/languages";
 import {
   createDocument,
+  LARGE_FILE_THRESHOLD,
   loadSession,
   saveSession,
   type EditorDocument,
@@ -185,7 +187,11 @@ function downloadText(fileName: string, content: string) {
 }
 
 function lineCount(content: string) {
-  return content.length === 0 ? 1 : content.split(/\r\n|\r|\n/).length;
+  let lines = 1;
+  for (let index = 0; index < content.length; index += 1) {
+    if (content.charCodeAt(index) === 10) lines += 1;
+  }
+  return lines;
 }
 
 function detectEol(content: string) {
@@ -209,6 +215,7 @@ function App() {
   const [directoryFiles, setDirectoryFiles] = useState<DirectoryEntry[]>([]);
   const [directoryTruncated, setDirectoryTruncated] = useState(false);
   const [openingPath, setOpeningPath] = useState("");
+  const [openingRecentId, setOpeningRecentId] = useState("");
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const directoryInputRef = useRef<HTMLInputElement | null>(null);
@@ -223,24 +230,31 @@ function App() {
     [documents]
   );
 
+  const largeFileMode = activeDocument.content.length >= LARGE_FILE_THRESHOLD;
+  const searchLimit = largeFileMode ? 500 : Number.POSITIVE_INFINITY;
+
   const searchResult = useMemo(() => {
     try {
-      return { matches: findMatches(activeDocument.content, searchOptions), error: "" };
+      const matches = searchOpen && searchOptions.query
+        ? findMatches(activeDocument.content, searchOptions, searchLimit)
+        : [];
+      return { matches, error: "", limited: Number.isFinite(searchLimit) && matches.length >= searchLimit };
     } catch (error) {
       return {
         matches: [] as SearchMatch[],
-        error: error instanceof Error ? error.message : "查找内容无效"
+        error: error instanceof Error ? error.message : "查找内容无效",
+        limited: false
       };
     }
-  }, [activeDocument.content, searchOptions]);
+  }, [activeDocument.content, searchLimit, searchOpen, searchOptions]);
 
   const status = useMemo(
     () => ({
-      lines: lineCount(activeDocument.content),
+      lines: largeFileMode ? null : lineCount(activeDocument.content),
       characters: activeDocument.content.length,
-      eol: detectEol(activeDocument.content)
+      eol: detectEol(activeDocument.content.slice(0, 16_384))
     }),
-    [activeDocument.content]
+    [activeDocument.content, largeFileMode]
   );
 
   const activeLanguage = useMemo(
@@ -248,7 +262,13 @@ function App() {
     [activeDocument.name]
   );
 
-  useEffect(() => saveSession({ documents, activeId, settings }), [activeId, documents, settings]);
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => saveSession({ documents, activeId, settings }),
+      documents.some((document) => document.content.length >= LARGE_FILE_THRESHOLD) ? 800 : 250
+    );
+    return () => window.clearTimeout(timer);
+  }, [activeId, documents, settings]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.theme;
@@ -464,10 +484,27 @@ function App() {
     setScreen("editor");
   }
 
-  function openRecent(document: EditorDocument) {
+  async function openRecent(document: EditorDocument) {
+    if (document.contentUnavailable && document.nativeUri) {
+      setOpeningRecentId(document.id);
+      try {
+        const file = await readNativeTextFile(document.nativeUri);
+        if (file?.content === undefined) throw new Error("File is unavailable");
+        updateDocument(document.id, { content: file.content, contentUnavailable: false, dirty: false });
+      } catch {
+        window.alert("无法重新读取该文件，它可能已被移动或权限已失效。");
+        return;
+      } finally {
+        setOpeningRecentId("");
+      }
+    }
     setActiveId(document.id);
     setScreen("editor");
     setTimeout(() => editorRef.current?.focus(), 0);
+  }
+
+  function removeRecent(document: EditorDocument) {
+    closeDocument(document.id);
   }
 
   async function saveAs(fileName: string, content: string) {
@@ -619,7 +656,9 @@ function App() {
 
   const matchLabel = searchResult.error
     ? searchResult.error
-    : `${searchResult.matches.length} 个匹配`;
+    : searchResult.limited
+      ? `显示前 ${searchResult.matches.length} 个匹配`
+      : `${searchResult.matches.length} 个匹配`;
 
   if (screen === "home") {
     return (
@@ -666,11 +705,21 @@ function App() {
             <div className="recent-heading"><span><History size={17} />打开最近</span><small>{recentDocuments.length} 个项目</small></div>
             <div className="recent-list">
               {recentDocuments.map((document) => (
-                <button key={document.id} onClick={() => openRecent(document)} type="button">
-                  <FileText size={18} />
-                  <span><strong>{document.name}</strong><small>{document.dirty ? "有未保存的修改" : "最近编辑"}</small></span>
-                  <ChevronRight size={18} />
-                </button>
+                <div className="recent-item" key={document.id}>
+                  <button
+                    className="recent-open"
+                    disabled={openingRecentId === document.id}
+                    onClick={() => void openRecent(document)}
+                    type="button"
+                  >
+                    <FileText size={18} />
+                    <span><strong>{document.name}</strong><small>{openingRecentId === document.id ? "正在读取…" : document.dirty ? "有未保存的修改" : "最近编辑"}</small></span>
+                    <ChevronRight size={18} />
+                  </button>
+                  <button className="recent-delete" onClick={() => removeRecent(document)} title="从最近打开中删除" type="button">
+                    <Trash2 size={17} />
+                  </button>
+                </div>
               ))}
             </div>
           </section>
@@ -723,14 +772,15 @@ function App() {
           <IconButton icon={Redo2} label="重做" onClick={() => editorRef.current?.redo()} />
           <IconButton active={searchOpen} icon={Search} label="查找和替换" onClick={() => setSearchOpen(!searchOpen)} />
           <label
-            className={`wrap-toggle${settings.lineWrapping ? " is-active" : ""}`}
-            title={settings.lineWrapping ? "自动换行已开启" : "自动换行已关闭，可左右滚动"}
+            className={`wrap-toggle${settings.lineWrapping && !largeFileMode ? " is-active" : ""}${largeFileMode ? " is-disabled" : ""}`}
+            title={largeFileMode ? "大文件模式下已关闭自动换行" : settings.lineWrapping ? "自动换行已开启" : "自动换行已关闭，可左右滚动"}
           >
             <WrapText size={17} strokeWidth={2} />
             <span>换行</span>
             <input
               aria-label="自动换行"
-              checked={settings.lineWrapping}
+              checked={settings.lineWrapping && !largeFileMode}
+              disabled={largeFileMode}
               onChange={(event) => updateSettings({ lineWrapping: event.target.checked })}
               type="checkbox"
             />
@@ -858,7 +908,8 @@ function App() {
               content={activeDocument.content}
               fileName={activeDocument.name}
               fontSize={settings.fontSize}
-              lineWrapping={settings.lineWrapping}
+              largeFileMode={largeFileMode}
+              lineWrapping={settings.lineWrapping && !largeFileMode}
               onChange={(content) => updateDocument(activeDocument.id, { content, dirty: true })}
               onCursorChange={setCursor}
               onFontSizeChange={(fontSize) => updateSettings({ fontSize })}
@@ -872,8 +923,8 @@ function App() {
       <footer className="statusbar">
         <span>Ln {cursor.line}, Col {cursor.column}</span>
         <span>{activeLanguage}</span>
-        <span>{settings.lineWrapping ? "自动换行" : "左右滚动"}</span>
-        <span>{status.lines} 行</span>
+        <span>{largeFileMode ? "大文件模式" : settings.lineWrapping ? "自动换行" : "左右滚动"}</span>
+        <span>{status.lines === null ? "跳过行数统计" : `${status.lines} 行`}</span>
         <span>{status.characters} 字符</span>
         <span>{status.eol}</span>
         <span>UTF-8</span>

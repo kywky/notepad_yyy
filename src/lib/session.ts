@@ -6,6 +6,7 @@ export type EditorDocument = {
   content: string;
   nativeUri?: string;
   sourcePath?: string;
+  contentUnavailable?: boolean;
   dirty: boolean;
   createdAt: number;
   updatedAt: number;
@@ -25,6 +26,7 @@ export type PersistedSession = {
 
 const STORAGE_KEY = "notepad-plus-session-v1";
 const LEGACY_STORAGE_KEY = "notepad-plus-web-session-v1";
+export const LARGE_FILE_THRESHOLD = 750_000;
 
 export const defaultSettings: EditorSettings = {
   theme: "light",
@@ -56,6 +58,7 @@ export function createDocument(options: {
     content: options.content ?? "",
     nativeUri: options.nativeUri,
     sourcePath: options.sourcePath,
+    contentUnavailable: false,
     dirty: options.dirty ?? false,
     createdAt: now,
     updatedAt: now
@@ -94,5 +97,21 @@ export function loadSession(): PersistedSession {
 }
 
 export function saveSession(session: PersistedSession): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  const persistableDocuments = session.documents
+    .filter((document) => document.content.length < LARGE_FILE_THRESHOLD || Boolean(document.nativeUri))
+    .map((document) => document.content.length >= LARGE_FILE_THRESHOLD
+      ? { ...document, content: "", contentUnavailable: true, dirty: false }
+      : { ...document, contentUnavailable: false });
+  const documents = persistableDocuments.length > 0
+    ? persistableDocuments
+    : [createDocument({ name: "新建文本-1.txt" })];
+  const activeId = documents.some((document) => document.id === session.activeId)
+    ? session.activeId
+    : documents[0].id;
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...session, documents, activeId }));
+  } catch {
+    // Mobile storage quotas are small; editing must continue if recovery data cannot be saved.
+  }
 }

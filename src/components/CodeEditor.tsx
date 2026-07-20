@@ -68,6 +68,7 @@ type CodeEditorProps = {
   onChange: (content: string) => void;
   onCursorChange: (cursor: CursorInfo) => void;
   onFontSizeChange: (fontSize: number) => void;
+  largeFileMode: boolean;
 };
 
 type SearchHighlight = TextMatch & { active: boolean };
@@ -134,7 +135,7 @@ function editorTheme(theme: ThemeMode, fontSize: number): Extension {
         minWidth: "0",
         width: "100%",
         color: dark ? "#dce5ef" : "#17202b",
-        backgroundColor: dark ? "#121820" : "#ffffff",
+        backgroundColor: "transparent",
         fontSize: `${fontSize}px`
       },
       ".cm-scroller": {
@@ -149,7 +150,7 @@ function editorTheme(theme: ThemeMode, fontSize: number): Extension {
       ".cm-content": { minHeight: "100%", caretColor: dark ? "#f3f7fb" : "#111827" },
       ".cm-line": { padding: "0 8px" },
       ".cm-gutters": {
-        backgroundColor: dark ? "#18212f" : "#eef2f6",
+        backgroundColor: dark ? "rgba(24, 33, 47, .9)" : "rgba(238, 242, 246, .9)",
         color: dark ? "#8896a8" : "#667386",
         borderRight: `1px solid ${dark ? "#263547" : "#d7dde5"}`
       },
@@ -351,6 +352,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     if (!view) return;
 
     view.dispatch({ effects: compartments.language.reconfigure([]) });
+    if (props.largeFileMode) return;
     void loadLanguageExtension(props.fileName)
       .then((extension) => {
         if (active && viewRef.current === view) {
@@ -362,7 +364,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>((props, ref) =>
     return () => {
       active = false;
     };
-  }, [compartments.language, props.fileName]);
+  }, [compartments.language, props.fileName, props.largeFileMode]);
 
   useEffect(() => {
     viewRef.current?.dispatch({

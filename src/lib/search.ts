@@ -28,7 +28,7 @@ export function buildSearchRegExp(options: SearchOptions, global = true): RegExp
   return new RegExp(guardedSource, flags);
 }
 
-export function findMatches(content: string, options: SearchOptions): SearchMatch[] {
+export function findMatches(content: string, options: SearchOptions, limit = Number.POSITIVE_INFINITY): SearchMatch[] {
   const expression = buildSearchRegExp(options);
 
   if (!expression) {
@@ -44,6 +44,8 @@ export function findMatches(content: string, options: SearchOptions): SearchMatc
       to: match.index + match[0].length,
       text: match[0]
     });
+
+    if (matches.length >= limit) break;
 
     if (match[0].length === 0) {
       expression.lastIndex += 1;

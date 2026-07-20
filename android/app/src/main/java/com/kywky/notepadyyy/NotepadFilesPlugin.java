@@ -65,12 +65,7 @@ public class NotepadFilesPlugin extends Plugin {
         Uri uri = result.getData().getData();
         persistUriPermission(result.getData(), uri);
 
-        try {
-            JSObject ret = readUri(uri);
-            call.resolve(ret);
-        } catch (Exception error) {
-            call.reject("Could not read selected file.", error);
-        }
+        readUriAsync(call, uri, "Could not read selected file.");
     }
 
     @PluginMethod
@@ -132,11 +127,7 @@ public class NotepadFilesPlugin extends Plugin {
             return;
         }
 
-        try {
-            call.resolve(readUri(Uri.parse(uriString)));
-        } catch (Exception error) {
-            call.reject("Could not read file.", error);
-        }
+        readUriAsync(call, Uri.parse(uriString), "Could not read file.");
     }
 
     @PluginMethod
@@ -312,6 +303,17 @@ public class NotepadFilesPlugin extends Plugin {
             ret.put("uri", uri.toString());
             return ret;
         }
+    }
+
+    private void readUriAsync(PluginCall call, Uri uri, String errorMessage) {
+        new Thread(() -> {
+            try {
+                JSObject result = readUri(uri);
+                getActivity().runOnUiThread(() -> call.resolve(result));
+            } catch (Exception error) {
+                getActivity().runOnUiThread(() -> call.reject(errorMessage, error));
+            }
+        }, "notepad-file-reader").start();
     }
 
     private void persistUriPermission(Intent data, Uri uri) {
