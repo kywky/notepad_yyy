@@ -154,6 +154,41 @@ button { color: inherit; }
   grid-template-rows: auto auto minmax(0, 1fr) 24px;
 }
 
+.app-shell.focus-mode { grid-template-rows: minmax(0, 1fr); }
+.app-shell.focus-mode .topbar,
+.app-shell.focus-mode .statusbar { display: none; }
+.app-shell.focus-mode .editor-workspace { grid-template-rows: minmax(0, 1fr); }
+.app-shell.focus-mode .tab-strip { display: none; }
+.app-shell.focus-mode .editor-pane {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.exit-focus-button {
+  position: fixed;
+  z-index: 40;
+  top: max(8px, env(safe-area-inset-top));
+  right: max(8px, env(safe-area-inset-right));
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--muted);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  opacity: .72;
+  backdrop-filter: blur(12px);
+}
+.exit-focus-button:hover,
+.exit-focus-button:active,
+.exit-focus-button:focus-visible { opacity: 1; color: var(--text); }
+
 .topbar {
   position: relative;
   z-index: 20;
@@ -499,6 +534,14 @@ button { color: inherit; }
   overflow: hidden;
   touch-action: pan-x pan-y;
 }
+.editor-loading {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
 .editor-host .cm-editor {
   width: 100%;
   height: 100%;
@@ -600,3 +643,4 @@ button { color: inherit; }
 .app-shell.keyboard-open .statusbar { display: none; }
 .app-shell.keyboard-open { grid-template-rows: auto minmax(0, 1fr); }
 .app-shell.search-open.keyboard-open { grid-template-rows: auto auto minmax(0, 1fr); }
+.app-shell.focus-mode.keyboard-open { grid-template-rows: minmax(0, 1fr); }

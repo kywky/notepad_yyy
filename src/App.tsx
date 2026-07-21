@@ -8,7 +8,9 @@ import {
   Home,
   FolderOpen,
   FolderTree,
+  Maximize2,
   Minus,
+  Minimize2,
   Moon,
   PanelLeft,
   Plus,
@@ -23,18 +25,20 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  lazy,
   useMemo,
   useRef,
   useState,
+  Suspense,
   type ChangeEvent,
   type DragEvent,
   type MouseEvent,
   type PointerEvent
 } from "react";
 import { createPortal } from "react-dom";
-import CodeEditor, {
-  type CodeEditorHandle,
-  type CursorInfo
+import type {
+  CodeEditorHandle,
+  CursorInfo
 } from "./components/CodeEditor";
 import { languageLabel } from "./lib/languages";
 import {
@@ -60,6 +64,7 @@ import {
   openNativeTextFile,
   readNativeTextFile,
   exitNativeApp,
+  setNativeFullscreen,
   saveNativeTextFile,
   writeNativeTextFile,
   type NativeDirectoryFile,
@@ -81,6 +86,8 @@ type DirectoryEntry = {
   uri?: string;
   file?: File;
 };
+
+const CodeEditor = lazy(() => import("./components/CodeEditor"));
 
 const initialSession = loadSession();
 const initialCursor: CursorInfo = { line: 1, column: 1, offset: 0, selectionLength: 0 };
@@ -210,6 +217,7 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [directoryName, setDirectoryName] = useState("目录");
   const [directoryFiles, setDirectoryFiles] = useState<DirectoryEntry[]>([]);
@@ -312,7 +320,9 @@ function App() {
 
   useEffect(() => {
     const handleNativeBack = () => {
-      if (searchOpen) {
+      if (focusMode) {
+        void leaveFocusMode();
+      } else if (searchOpen) {
         setSearchOpen(false);
       } else if (sidebarOpen) {
         setSidebarOpen(false);
@@ -324,10 +334,15 @@ function App() {
     };
     window.addEventListener("notepadNativeBack", handleNativeBack);
     return () => window.removeEventListener("notepadNativeBack", handleNativeBack);
-  }, [screen, searchOpen, sidebarOpen]);
+  }, [focusMode, screen, searchOpen, sidebarOpen]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && focusMode) {
+        event.preventDefault();
+        void leaveFocusMode();
+        return;
+      }
       if (!(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
       if (key === "s") {
@@ -349,6 +364,16 @@ function App() {
   });
 
   useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && focusMode && !hasNativeFilePicker()) {
+        setFocusMode(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, [focusMode]);
+
+  useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!documents.some((document) => document.dirty)) return;
       event.preventDefault();
@@ -360,6 +385,35 @@ function App() {
 
   function updateSettings(patch: Partial<EditorSettings>) {
     setSettings((current) => ({ ...current, ...patch }));
+  }
+
+  async function enterFocusMode() {
+    setSearchOpen(false);
+    setSidebarOpen(false);
+    setFocusMode(true);
+    try {
+      if (hasNativeFilePicker()) {
+        await setNativeFullscreen(true);
+      } else if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      // The CSS focus layout still provides a useful full-editor view.
+    }
+    setTimeout(() => editorRef.current?.focus(), 0);
+  }
+
+  async function leaveFocusMode() {
+    setFocusMode(false);
+    try {
+      if (hasNativeFilePicker()) {
+        await setNativeFullscreen(false);
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // System UI may already have left fullscreen.
+    }
   }
 
   function updateDocument(id: string, patch: Partial<EditorDocument>) {
@@ -730,7 +784,7 @@ function App() {
 
   return (
     <div
-      className={`app-shell${searchOpen ? " search-open" : ""}${keyboardOpen ? " keyboard-open" : ""}`}
+      className={`app-shell${searchOpen ? " search-open" : ""}${keyboardOpen ? " keyboard-open" : ""}${focusMode ? " focus-mode" : ""}`}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
@@ -771,6 +825,7 @@ function App() {
           <IconButton icon={Undo2} label="撤销" onClick={() => editorRef.current?.undo()} />
           <IconButton icon={Redo2} label="重做" onClick={() => editorRef.current?.redo()} />
           <IconButton active={searchOpen} icon={Search} label="查找和替换" onClick={() => setSearchOpen(!searchOpen)} />
+          <IconButton icon={Maximize2} label="全屏专注模式" onClick={() => void enterFocusMode()} />
           <label
             className={`wrap-toggle${settings.lineWrapping && !largeFileMode ? " is-active" : ""}${largeFileMode ? " is-disabled" : ""}`}
             title={largeFileMode ? "大文件模式下已关闭自动换行" : settings.lineWrapping ? "自动换行已开启" : "自动换行已关闭，可左右滚动"}
@@ -902,20 +957,22 @@ function App() {
           </div>
 
           <main className="editor-pane">
-            <CodeEditor
-              ref={editorRef}
-              activeSearchIndex={activeSearchIndex}
-              content={activeDocument.content}
-              fileName={activeDocument.name}
-              fontSize={settings.fontSize}
-              largeFileMode={largeFileMode}
-              lineWrapping={settings.lineWrapping && !largeFileMode}
-              onChange={(content) => updateDocument(activeDocument.id, { content, dirty: true })}
-              onCursorChange={setCursor}
-              onFontSizeChange={(fontSize) => updateSettings({ fontSize })}
-              searchMatches={searchResult.matches}
-              theme={settings.theme}
-            />
+            <Suspense fallback={<div className="editor-loading">正在加载编辑器…</div>}>
+              <CodeEditor
+                ref={editorRef}
+                activeSearchIndex={activeSearchIndex}
+                content={activeDocument.content}
+                fileName={activeDocument.name}
+                fontSize={settings.fontSize}
+                largeFileMode={largeFileMode}
+                lineWrapping={settings.lineWrapping && !largeFileMode}
+                onChange={(content) => updateDocument(activeDocument.id, { content, dirty: true })}
+                onCursorChange={setCursor}
+                onFontSizeChange={(fontSize) => updateSettings({ fontSize })}
+                searchMatches={searchResult.matches}
+                theme={settings.theme}
+              />
+            </Suspense>
           </main>
         </section>
       </div>
@@ -930,6 +987,17 @@ function App() {
         <span>UTF-8</span>
         <span>{activeDocument.dirty ? "未保存" : "已保存"}</span>
       </footer>
+      {focusMode ? (
+        <button
+          aria-label="退出全屏专注模式"
+          className="exit-focus-button"
+          onClick={() => void leaveFocusMode()}
+          title="退出全屏"
+          type="button"
+        >
+          <Minimize2 size={18} />
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -40,10 +40,15 @@ type ReadTextFileOptions = {
   uri: string;
 };
 
+type FullscreenOptions = {
+  enabled: boolean;
+};
+
 type NotepadFilesPlugin = {
   openTextFile: () => Promise<NativeTextFile>;
   openDirectory: () => Promise<NativeDirectory>;
   readTextFile: (options: ReadTextFileOptions) => Promise<NativeTextFile>;
+  setFullscreen: (options: FullscreenOptions) => Promise<void>;
   exitApp: () => Promise<void>;
   saveTextFile: (options: SaveTextFileOptions) => Promise<SaveTextFileResult>;
   writeTextFile: (options: WriteTextFileOptions) => Promise<{ uri: string }>;
@@ -96,6 +101,12 @@ export async function readNativeTextFile(uri: string) {
 export async function exitNativeApp() {
   if (hasNativeFilePicker()) {
     await NotepadFiles.exitApp();
+  }
+}
+
+export async function setNativeFullscreen(enabled: boolean) {
+  if (hasNativeFilePicker()) {
+    await NotepadFiles.setFullscreen({ enabled });
   }
 }
 
