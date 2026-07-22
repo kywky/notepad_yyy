@@ -19,6 +19,10 @@
 
 [项目交接文档](docs/PROJECT_HANDOFF.md)
 
+应用的完整操作方法见：
+
+[简明使用说明](docs/USER_GUIDE.md)
+
 ## 本地开发
 
 ```sh

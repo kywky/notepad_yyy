@@ -951,7 +951,24 @@ function App() {
           <IconButton icon={FilePlus2} label="新建文本" onClick={newDocument} />
           <IconButton icon={FolderOpen} label="打开任意文本文件" onClick={openFromDevice} />
           <IconButton icon={Save} label="保存文件" onClick={saveActiveDocument} />
+          <IconButton icon={FileText} label="另存为" onClick={saveActiveDocumentAs} />
+          <IconButton icon={Undo2} label="撤销" onClick={() => editorRef.current?.undo()} />
+          <IconButton icon={Redo2} label="重做" onClick={() => editorRef.current?.redo()} />
+          <IconButton icon={FolderTree} label="打开文件夹" onClick={openDirectory} />
+          <IconButton
+            active={sidebarOpen}
+            icon={PanelLeft}
+            label={sidebarOpen ? "隐藏侧边栏" : "显示侧边栏"}
+            onClick={() => setSidebarOpen((current) => !current)}
+          />
           <IconButton active={searchOpen} icon={Search} label="查找和替换" onClick={() => setSearchOpen(!searchOpen)} />
+          <IconButton
+            active={settings.lineWrapping && !largeFileMode}
+            disabled={largeFileMode}
+            icon={WrapText}
+            label={largeFileMode ? "大文件模式下已关闭自动换行" : settings.lineWrapping ? "关闭自动换行" : "开启自动换行"}
+            onClick={() => updateSettings({ lineWrapping: !settings.lineWrapping })}
+          />
           <IconButton icon={Maximize2} label="全屏专注模式" onClick={() => void enterFocusMode()} />
         </div>
       </header>
@@ -1095,24 +1112,9 @@ function App() {
         <div className="sheet-layer">
           <button aria-label="关闭更多菜单" className="sheet-scrim" onClick={() => setMoreOpen(false)} type="button" />
           <section aria-label="更多操作和设置" className="action-sheet">
-            <div className="sheet-header"><strong>更多操作</strong><IconButton icon={X} label="关闭" onClick={() => setMoreOpen(false)} /></div>
-            <div className="sheet-grid">
-              <button onClick={() => { setMoreOpen(false); void openDirectory(); }} type="button"><FolderTree size={19} /><span>打开文件夹</span></button>
-              <button onClick={() => { setSidebarOpen((current) => !current); setMoreOpen(false); }} type="button"><PanelLeft size={19} /><span>{sidebarOpen ? "隐藏侧边栏" : "显示侧边栏"}</span></button>
-              <button onClick={() => { editorRef.current?.undo(); setMoreOpen(false); }} type="button"><Undo2 size={19} /><span>撤销</span></button>
-              <button onClick={() => { editorRef.current?.redo(); setMoreOpen(false); }} type="button"><Redo2 size={19} /><span>重做</span></button>
-              <button onClick={() => { void saveActiveDocumentAs(); setMoreOpen(false); }} type="button"><Save size={19} /><span>另存为</span></button>
+            <div className="sheet-header"><strong>显示设置</strong><IconButton icon={X} label="关闭" onClick={() => setMoreOpen(false)} /></div>
+            <div className="sheet-grid sheet-grid-compact">
               <button onClick={() => { updateSettings({ theme: settings.theme === "dark" ? "light" : "dark" }); }} type="button">{settings.theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}<span>{settings.theme === "dark" ? "浅色主题" : "深色主题"}</span></button>
-            </div>
-            <div className="sheet-setting-row">
-              <span><WrapText size={18} />自动换行</span>
-              <button
-                aria-pressed={settings.lineWrapping && !largeFileMode}
-                className={`setting-switch${settings.lineWrapping && !largeFileMode ? " is-active" : ""}`}
-                disabled={largeFileMode}
-                onClick={() => updateSettings({ lineWrapping: !settings.lineWrapping })}
-                type="button"
-              ><span /></button>
             </div>
             <div className="sheet-setting-row">
               <span>字体大小</span>
@@ -1122,7 +1124,6 @@ function App() {
                 <IconButton disabled={settings.fontSize >= 32} icon={Plus} label="增大字体" onClick={() => updateSettings({ fontSize: Math.min(32, settings.fontSize + 1) })} />
               </div>
             </div>
-            {largeFileMode ? <div className="sheet-note">大文件模式下自动换行已关闭</div> : null}
           </section>
         </div>
       ) : null}
