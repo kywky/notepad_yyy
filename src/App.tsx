@@ -9,6 +9,7 @@ import {
   FolderOpen,
   FolderTree,
   Maximize2,
+  Menu,
   Minus,
   Minimize2,
   Moon,
@@ -86,6 +87,16 @@ type DirectoryEntry = {
   uri?: string;
   file?: File;
 };
+
+function isRecentDocument(document: EditorDocument) {
+  return Boolean(
+    document.dirty ||
+    document.content.length > 0 ||
+    document.nativeUri ||
+    document.sourcePath ||
+    document.contentUnavailable
+  );
+}
 
 const CodeEditor = lazy(() => import("./components/CodeEditor"));
 
@@ -218,6 +229,9 @@ function App() {
   const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [tabMenuId, setTabMenuId] = useState("");
+  const [notice, setNotice] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [directoryName, setDirectoryName] = useState("目录");
   const [directoryFiles, setDirectoryFiles] = useState<DirectoryEntry[]>([]);
@@ -227,6 +241,9 @@ function App() {
   const editorRef = useRef<CodeEditorHandle | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const directoryInputRef = useRef<HTMLInputElement | null>(null);
+  const noticeTimerRef = useRef<number | null>(null);
+  const tabPressTimerRef = useRef<number | null>(null);
+  const tabLongPressRef = useRef(false);
 
   const activeDocument = useMemo(
     () => documents.find((document) => document.id === activeId) ?? documents[0],
@@ -234,8 +251,16 @@ function App() {
   );
 
   const recentDocuments = useMemo(
-    () => [...documents].sort((left, right) => right.updatedAt - left.updatedAt).slice(0, 5),
+    () => documents
+      .filter(isRecentDocument)
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .slice(0, 5),
     [documents]
+  );
+
+  const tabMenuDocument = useMemo(
+    () => documents.find((document) => document.id === tabMenuId),
+    [documents, tabMenuId]
   );
 
   const largeFileMode = activeDocument.content.length >= LARGE_FILE_THRESHOLD;
@@ -320,7 +345,11 @@ function App() {
 
   useEffect(() => {
     const handleNativeBack = () => {
-      if (focusMode) {
+      if (tabMenuId) {
+        setTabMenuId("");
+      } else if (moreOpen) {
+        setMoreOpen(false);
+      } else if (focusMode) {
         void leaveFocusMode();
       } else if (searchOpen) {
         setSearchOpen(false);
@@ -334,10 +363,20 @@ function App() {
     };
     window.addEventListener("notepadNativeBack", handleNativeBack);
     return () => window.removeEventListener("notepadNativeBack", handleNativeBack);
-  }, [focusMode, screen, searchOpen, sidebarOpen]);
+  }, [focusMode, moreOpen, screen, searchOpen, sidebarOpen, tabMenuId]);
 
   useEffect(() => {
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && tabMenuId) {
+        event.preventDefault();
+        setTabMenuId("");
+        return;
+      }
+      if (event.key === "Escape" && moreOpen) {
+        event.preventDefault();
+        setMoreOpen(false);
+        return;
+      }
       if (event.key === "Escape" && focusMode) {
         event.preventDefault();
         void leaveFocusMode();
@@ -383,13 +422,27 @@ function App() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [documents]);
 
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+      if (tabPressTimerRef.current !== null) window.clearTimeout(tabPressTimerRef.current);
+    };
+  }, []);
+
   function updateSettings(patch: Partial<EditorSettings>) {
     setSettings((current) => ({ ...current, ...patch }));
+  }
+
+  function showNotice(message: string) {
+    if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current);
+    setNotice(message);
+    noticeTimerRef.current = window.setTimeout(() => setNotice(""), 1900);
   }
 
   async function enterFocusMode() {
     setSearchOpen(false);
     setSidebarOpen(false);
+    setMoreOpen(false);
     setFocusMode(true);
     try {
       if (hasNativeFilePicker()) {
@@ -558,7 +611,24 @@ function App() {
   }
 
   function removeRecent(document: EditorDocument) {
-    closeDocument(document.id);
+    if (closeDocument(document.id)) showNotice("已从最近打开中删除");
+  }
+
+  function clearRecent() {
+    const targets = documents.filter(isRecentDocument);
+    if (targets.length === 0) return;
+    if (
+      targets.some((document) => document.dirty) &&
+      !window.confirm("最近记录中包含未保存的修改，仍然全部清空吗？")
+    ) return;
+
+    const remaining = documents.filter((document) => !isRecentDocument(document));
+    const next = remaining.length > 0
+      ? remaining
+      : [createDocument({ name: "新建文本-1.txt" })];
+    setDocuments(next);
+    setActiveId(next[0].id);
+    showNotice("最近打开已清空");
   }
 
   async function saveAs(fileName: string, content: string) {
@@ -580,6 +650,7 @@ function App() {
       try {
         await writeNativeTextFile({ uri: activeDocument.nativeUri, content: activeDocument.content });
         updateDocument(activeDocument.id, { dirty: false });
+        showNotice("文件已保存");
         return;
       } catch {
         window.alert("原文件无法写入，请重新选择保存位置。");
@@ -595,23 +666,25 @@ function App() {
         dirty: false,
         nativeUri: result.uri ?? activeDocument.nativeUri
       });
+      showNotice("文件已保存");
     }
   }
 
   function closeDocument(id: string) {
     const document = documents.find((item) => item.id === id);
-    if (!document) return;
-    if (document.dirty && !window.confirm(`“${document.name}”尚未保存，仍然关闭吗？`)) return;
+    if (!document) return false;
+    if (document.dirty && !window.confirm(`“${document.name}”尚未保存，仍然关闭吗？`)) return false;
     if (documents.length === 1) {
       const replacement = createDocument({ name: "新建文本-1.txt" });
       setDocuments([replacement]);
       setActiveId(replacement.id);
-      return;
+      return true;
     }
     const index = documents.findIndex((item) => item.id === id);
     const next = documents.filter((item) => item.id !== id);
     setDocuments(next);
     if (activeId === id) setActiveId(next[Math.max(0, index - 1)]?.id ?? next[0].id);
+    return true;
   }
 
   function renameDocument(id: string) {
@@ -619,6 +692,58 @@ function App() {
     if (!document) return;
     const name = window.prompt("文件名", document.name)?.trim();
     if (name) updateDocument(id, { name });
+  }
+
+  function closeOtherDocuments(id: string) {
+    const target = documents.find((document) => document.id === id);
+    if (!target) return;
+    const others = documents.filter((document) => document.id !== id);
+    if (
+      others.some((document) => document.dirty) &&
+      !window.confirm("其他标签中包含未保存的修改，仍然关闭吗？")
+    ) return;
+    setDocuments([target]);
+    setActiveId(target.id);
+    setTabMenuId("");
+    showNotice("已关闭其他标签");
+  }
+
+  function closeAllDocuments() {
+    if (
+      documents.some((document) => document.dirty) &&
+      !window.confirm("标签中包含未保存的修改，仍然全部关闭吗？")
+    ) return;
+    const replacement = createDocument({ name: "新建文本-1.txt" });
+    setDocuments([replacement]);
+    setActiveId(replacement.id);
+    setTabMenuId("");
+    showNotice("已关闭全部标签");
+  }
+
+  function clearTabPressTimer() {
+    if (tabPressTimerRef.current !== null) {
+      window.clearTimeout(tabPressTimerRef.current);
+      tabPressTimerRef.current = null;
+    }
+  }
+
+  function handleTabPointerDown(event: PointerEvent<HTMLButtonElement>, id: string) {
+    if (event.pointerType === "mouse") return;
+    clearTabPressTimer();
+    tabLongPressRef.current = false;
+    tabPressTimerRef.current = window.setTimeout(() => {
+      tabLongPressRef.current = true;
+      setTabMenuId(id);
+      navigator.vibrate?.(12);
+    }, 430);
+  }
+
+  function handleTabClick(id: string) {
+    if (tabLongPressRef.current) {
+      tabLongPressRef.current = false;
+      return;
+    }
+    setActiveId(id);
   }
 
   function findNext() {
@@ -756,9 +881,19 @@ function App() {
           </section>
 
           <section className="recent-section">
-            <div className="recent-heading"><span><History size={17} />打开最近</span><small>{recentDocuments.length} 个项目</small></div>
+            <div className="recent-heading">
+              <span><History size={17} />打开最近</span>
+              <div className="recent-heading-actions">
+                <small>{recentDocuments.length} 个项目</small>
+                {recentDocuments.length > 0 ? (
+                  <button className="clear-recent" onClick={clearRecent} type="button">全部清空</button>
+                ) : null}
+              </div>
+            </div>
             <div className="recent-list">
-              {recentDocuments.map((document) => (
+              {recentDocuments.length === 0 ? (
+                <div className="recent-empty">暂无最近打开的文件</div>
+              ) : recentDocuments.map((document) => (
                 <div className="recent-item" key={document.id}>
                   <button
                     className="recent-open"
@@ -778,6 +913,7 @@ function App() {
             </div>
           </section>
         </main>
+        {notice ? <div className="notice-toast" role="status">{notice}</div> : null}
       </div>
     );
   }
@@ -804,56 +940,19 @@ function App() {
             {activeDocument.dirty ? "* " : ""}{activeDocument.name}
           </div>
           <IconButton
-            icon={settings.theme === "dark" ? Moon : Sun}
-            label="切换明暗主题"
-            onClick={() => updateSettings({ theme: settings.theme === "dark" ? "light" : "dark" })}
+            active={moreOpen}
+            icon={Menu}
+            label="更多操作和设置"
+            onClick={() => setMoreOpen(true)}
           />
         </div>
 
         <div className="main-toolbar" aria-label="常用操作">
           <IconButton icon={FilePlus2} label="新建文本" onClick={newDocument} />
           <IconButton icon={FolderOpen} label="打开任意文本文件" onClick={openFromDevice} />
-          <IconButton icon={FolderTree} label="打开目录" onClick={openDirectory} />
-          <IconButton
-            active={sidebarOpen}
-            icon={PanelLeft}
-            label={sidebarOpen ? "隐藏侧边栏" : "显示侧边栏"}
-            onClick={() => setSidebarOpen((current) => !current)}
-          />
           <IconButton icon={Save} label="保存文件" onClick={saveActiveDocument} />
-          <span className="toolbar-separator" />
-          <IconButton icon={Undo2} label="撤销" onClick={() => editorRef.current?.undo()} />
-          <IconButton icon={Redo2} label="重做" onClick={() => editorRef.current?.redo()} />
           <IconButton active={searchOpen} icon={Search} label="查找和替换" onClick={() => setSearchOpen(!searchOpen)} />
           <IconButton icon={Maximize2} label="全屏专注模式" onClick={() => void enterFocusMode()} />
-          <label
-            className={`wrap-toggle${settings.lineWrapping && !largeFileMode ? " is-active" : ""}${largeFileMode ? " is-disabled" : ""}`}
-            title={largeFileMode ? "大文件模式下已关闭自动换行" : settings.lineWrapping ? "自动换行已开启" : "自动换行已关闭，可左右滚动"}
-          >
-            <WrapText size={17} strokeWidth={2} />
-            <span>换行</span>
-            <input
-              aria-label="自动换行"
-              checked={settings.lineWrapping && !largeFileMode}
-              disabled={largeFileMode}
-              onChange={(event) => updateSettings({ lineWrapping: event.target.checked })}
-              type="checkbox"
-            />
-          </label>
-          <span className="toolbar-separator" />
-          <IconButton
-            disabled={settings.fontSize <= 11}
-            icon={Minus}
-            label="减小字体"
-            onClick={() => updateSettings({ fontSize: Math.max(11, settings.fontSize - 1) })}
-          />
-          <span className="font-size-label">{settings.fontSize}</span>
-          <IconButton
-            disabled={settings.fontSize >= 32}
-            icon={Plus}
-            label="增大字体"
-            onClick={() => updateSettings({ fontSize: Math.min(32, settings.fontSize + 1) })}
-          />
         </div>
       </header>
 
@@ -938,12 +1037,17 @@ function App() {
               <button
                 className={`tab${document.id === activeId ? " is-active" : ""}`}
                 key={document.id}
-                onClick={() => setActiveId(document.id)}
+                onClick={() => handleTabClick(document.id)}
+                onContextMenu={(event) => { event.preventDefault(); setTabMenuId(document.id); }}
                 onDoubleClick={() => renameDocument(document.id)}
+                onPointerCancel={clearTabPressTimer}
+                onPointerDown={(event) => handleTabPointerDown(event, document.id)}
+                onPointerLeave={clearTabPressTimer}
+                onPointerUp={clearTabPressTimer}
                 role="tab"
                 type="button"
               >
-                <span>{document.dirty ? `* ${document.name}` : document.name}</span>
+                <span className="tab-label">{document.dirty ? <i className="dirty-dot" /> : null}{document.name}</span>
                 <span
                   className="tab-close"
                   onClick={(event) => { event.stopPropagation(); closeDocument(document.id); }}
@@ -987,6 +1091,56 @@ function App() {
         <span>UTF-8</span>
         <span>{activeDocument.dirty ? "未保存" : "已保存"}</span>
       </footer>
+      {moreOpen ? (
+        <div className="sheet-layer">
+          <button aria-label="关闭更多菜单" className="sheet-scrim" onClick={() => setMoreOpen(false)} type="button" />
+          <section aria-label="更多操作和设置" className="action-sheet">
+            <div className="sheet-header"><strong>更多操作</strong><IconButton icon={X} label="关闭" onClick={() => setMoreOpen(false)} /></div>
+            <div className="sheet-grid">
+              <button onClick={() => { setMoreOpen(false); void openDirectory(); }} type="button"><FolderTree size={19} /><span>打开文件夹</span></button>
+              <button onClick={() => { setSidebarOpen((current) => !current); setMoreOpen(false); }} type="button"><PanelLeft size={19} /><span>{sidebarOpen ? "隐藏侧边栏" : "显示侧边栏"}</span></button>
+              <button onClick={() => { editorRef.current?.undo(); setMoreOpen(false); }} type="button"><Undo2 size={19} /><span>撤销</span></button>
+              <button onClick={() => { editorRef.current?.redo(); setMoreOpen(false); }} type="button"><Redo2 size={19} /><span>重做</span></button>
+              <button onClick={() => { void saveActiveDocumentAs(); setMoreOpen(false); }} type="button"><Save size={19} /><span>另存为</span></button>
+              <button onClick={() => { updateSettings({ theme: settings.theme === "dark" ? "light" : "dark" }); }} type="button">{settings.theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}<span>{settings.theme === "dark" ? "浅色主题" : "深色主题"}</span></button>
+            </div>
+            <div className="sheet-setting-row">
+              <span><WrapText size={18} />自动换行</span>
+              <button
+                aria-pressed={settings.lineWrapping && !largeFileMode}
+                className={`setting-switch${settings.lineWrapping && !largeFileMode ? " is-active" : ""}`}
+                disabled={largeFileMode}
+                onClick={() => updateSettings({ lineWrapping: !settings.lineWrapping })}
+                type="button"
+              ><span /></button>
+            </div>
+            <div className="sheet-setting-row">
+              <span>字体大小</span>
+              <div className="font-stepper">
+                <IconButton disabled={settings.fontSize <= 11} icon={Minus} label="减小字体" onClick={() => updateSettings({ fontSize: Math.max(11, settings.fontSize - 1) })} />
+                <strong>{settings.fontSize}</strong>
+                <IconButton disabled={settings.fontSize >= 32} icon={Plus} label="增大字体" onClick={() => updateSettings({ fontSize: Math.min(32, settings.fontSize + 1) })} />
+              </div>
+            </div>
+            {largeFileMode ? <div className="sheet-note">大文件模式下自动换行已关闭</div> : null}
+          </section>
+        </div>
+      ) : null}
+      {tabMenuDocument ? (
+        <div className="sheet-layer">
+          <button aria-label="关闭标签菜单" className="sheet-scrim" onClick={() => setTabMenuId("")} type="button" />
+          <section aria-label="标签操作" className="action-sheet tab-action-sheet">
+            <div className="sheet-header"><strong title={tabMenuDocument.name}>{tabMenuDocument.name}</strong><IconButton icon={X} label="关闭" onClick={() => setTabMenuId("")} /></div>
+            <div className="tab-action-list">
+              <button onClick={() => { renameDocument(tabMenuDocument.id); setTabMenuId(""); }} type="button">重命名</button>
+              <button onClick={() => { if (closeDocument(tabMenuDocument.id)) { setTabMenuId(""); showNotice("标签已关闭"); } }} type="button">关闭标签</button>
+              <button disabled={documents.length <= 1} onClick={() => closeOtherDocuments(tabMenuDocument.id)} type="button">关闭其他标签</button>
+              <button className="is-danger" onClick={closeAllDocuments} type="button">关闭全部标签</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {notice ? <div className="notice-toast" role="status">{notice}</div> : null}
       {focusMode ? (
         <button
           aria-label="退出全屏专注模式"
